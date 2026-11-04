@@ -1,9 +1,9 @@
 # Agentic AI assessment: extend the Document Agent - how to submit
 
 ## At a glance
-- Build: extend the Document Agent: add a tool, make it observable, SQLite chat memory, one shared knowledge base (see `docs/TASK.md`)
+- Build: integrate the Document Agent: agent definition, async tools, SQLite chat memory, Alembic migration, user management with per-user knowledge bases, two new tools with observability, knowledge-base management tools (see `docs/TASK.md`)
 - Window: **the opening time your instructor announced** to **the closing time your instructor announced** (judged on when your GitHub Actions run finishes)
-- Pass: **all 10 points** (every task is required; partial scores are recorded too)
+- Pass: **all 26 points** (every task is required; partial scores are recorded too)
 - You may submit as many times as you like; **your best score is kept**
 - Result arrives by **email** (check spam)
 
@@ -86,17 +86,7 @@ GitHub, then **Settings, Developer settings, Personal access tokens, Fine-graine
 - Solutions are compared across students; matching code is flagged for review
 
 ## Scoring
-| Check | Points |
-|---|---|
-| Your new tool is registered with the agent (`tool-registered`) | 1 |
-| Your tool works with valid arguments (`tool-works`) | 1 |
-| Your tool reports bad input as ERROR[CODE] (`tool-errors`) | 1 |
-| Your tool records its own metric (`tool-metric`) | 1 |
-| Your tool writes a structured log line (`tool-log`) | 1 |
-| Upload, ingest, search and citations still work (`baseline`) | 1 |
-| A document uploaded in one chat is searchable from another (`shared-kb`) | 1 |
-| The shared knowledge base survives a restart (`kb-persists`) | 1 |
-| Chat memory survives a restart (SQLite checkpointer) (`sqlite-memory`) | 2 |
+The full table of the 26 checks (ids, points, what each one proves) is in `docs/TASK.md`. The email lists every check as PASS or FAIL.
 
 ## If something goes wrong
 The email says what failed. Common ones:

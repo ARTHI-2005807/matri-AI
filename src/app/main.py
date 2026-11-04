@@ -1,7 +1,6 @@
-import json
+import sqlite3
 import time
 import uuid
-from pathlib import Path
 from contextlib import asynccontextmanager
 
 import structlog
@@ -32,10 +31,14 @@ from app.tools_s1 import CHARTS_DIR
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app.state.kb = KnowledgeBase()  # loads the embedder, opens Qdrant + SQLite
-    async with open_checkpointer() as checkpointer:  # chat memory lives as long as the app does (see persistence.py)
-        app.state.agent, app.state.tool_names = await build_agent(app.state.kb, checkpointer=checkpointer)
-        log.info("startup_complete", tools=app.state.tool_names)
-        yield
+    # TODO(task 3): integrate the checkpointer. `open_checkpointer()` (persistence.py) is an async CONTEXT MANAGER that you
+    #   write: open it here, pass the saver to build_agent(..., checkpointer=saver), and keep it open until shutdown
+    #   (everything from build_agent to `yield` goes inside the `async with`). Today the agent has no memory at all.
+    agent, tools = await build_agent(app.state.kb)
+    app.state.agent, app.state.tools = agent, tools
+    app.state.tool_names = [t.name for t in tools]
+    log.info("startup_complete", tools=app.state.tool_names)
+    yield
     shutdown_telemetry()
 
 
@@ -65,6 +68,11 @@ async def observe(request: Request, call_next):
             HTTP_DURATION.record(elapsed, attrs)
             log.info("http_request", route=route, method=request.method, status=status,
                      duration_ms=round(elapsed * 1000))
+
+
+# TODO(task 4): users and authentication. See users.py for the contract. In short: POST /users, POST /login, GET /me, POST /logout,
+#   DELETE /users/me, a FastAPI dependency that turns `Authorization: Bearer <token>` into the current user (401 otherwise) and is used by /agent, /upload and /kb;
+#   /agent passes context=Ctx(session_id=..., user_id=...); a thread belongs to its first user (403 for anybody else).
 
 
 @app.get("/health")
@@ -138,10 +146,21 @@ if DEBUG:  # ASSESSMENT_DEBUG=1: what the autograder (and you) can inspect
         """Metrics recorded so far (in memory) and the most recent structured log events."""
         return {"metrics": metrics_snapshot(), "logs": list(LOG_BUFFER)[-300:]}
 
-    @app.get("/debug/assessment")
-    async def debug_assessment():
-        """Your declaration from src/app/assessment.json."""
-        path = Path(__file__).with_name("assessment.json")
-        if not path.exists():
-            raise HTTPException(status_code=404, detail="assessment.json is missing")
-        return json.loads(path.read_text())
+    @app.get("/debug/tools")
+    async def debug_tools(request: Request):
+        """Every registered tool and whether it is async (has a coroutine): the autograder checks the async conversion here."""
+        return [{"name": t.name, "async": getattr(t, "coroutine", None) is not None} for t in request.app.state.tools]
+
+    @app.get("/debug/schema")
+    async def debug_schema():
+        """Tables and columns of the users database and the Alembic revision it is at (the autograder checks your migration here)."""
+        from app.users import users_db_path
+
+        con = sqlite3.connect(users_db_path())
+        try:
+            tables = {t: [r[1] for r in con.execute(f'PRAGMA table_info("{t}")')]
+                      for (t,) in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            revision = [r[0] for r in con.execute("SELECT version_num FROM alembic_version")] if "alembic_version" in tables else []
+        finally:
+            con.close()
+        return {"tables": tables, "alembic_revision": revision}

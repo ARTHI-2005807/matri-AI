@@ -1,4 +1,10 @@
-"""The two knowledge-base tools. Docstrings are prompts: they decide when the model picks the tool."""
+"""The two knowledge-base tools. Docstrings are prompts: they decide when the model picks the tool.
+
+TODO(task 2): search_knowledge_base is a sync function that blocks (embedding + Qdrant): make it `async def`, call kb.search
+  through asyncio.to_thread.
+TODO(task 4): the knowledge base is keyed by the chat's session id. Key it by the USER (runtime.context.user_id, add it to
+  Ctx in context.py): ingest and search must use the user's id, so every chat of a user shares one knowledge base and nobody else sees it.
+"""
 from langchain.tools import ToolRuntime
 from langchain_core.tools import ToolException, tool
 

@@ -1,4 +1,14 @@
-"""The Session 1 tools, unchanged: weather, web_fetch, sql_query, make_chart, openml_*, pandas_query.
+"""The Session 1 tools: weather, web_fetch, sql_query, make_chart, openml_*, pandas_query.
+
+TODO(task 2): the API is async (FastAPI + an async agent). A BLOCKING call inside a tool freezes every other request
+while it runs. Convert these four tools to `async def` and keep the event loop free:
+  get_weather            plain function -> async def (no I/O, but keep the whole tool set async)
+  web_fetch              trafilatura.fetch_url blocks: download with httpx.AsyncClient (timeout=15, follow_redirects=True),
+                         then run the CPU-heavy trafilatura.extract in asyncio.to_thread
+  sql_query              sqlite3 blocks: run the query in asyncio.to_thread (or use aiosqlite, already installed)
+  search_knowledge_base  in kb/tools.py: embedding + Qdrant block -> asyncio.to_thread(kb.search, ...)
+The output of every tool must stay exactly the same. The autograder checks /debug/tools (async=true) and scans these
+functions for blocking calls (time.sleep, httpx.get/Client, requests, sqlite3.connect, trafilatura.fetch_url).
 
 Only the paths moved (data/ in this project, cache under 'session5-agent'). Charts are written to CHARTS_DIR
 and served by the API at /charts so the Gradio UI can show them.

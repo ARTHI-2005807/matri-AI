@@ -10,11 +10,14 @@ Gradio UI :7860 --> FastAPI agent :8000 --> Groq (LLM) · Qdrant (vectors) · SQ
                           +--> OpenTelemetry Collector --> Tempo (traces) · Prometheus (metrics) · Loki (logs) --> Grafana :3000
 ```
 
-## Your four tasks (details and grading in [docs/TASK.md](docs/TASK.md))
-1. **Add a tool** to the agent
-2. **Make it observable**: its own metric + a structured log line + a Grafana panel
-3. **SQLite chat memory**: conversations must survive a restart (today they live in memory)
-4. **One shared knowledge base**: a document uploaded in one chat must be usable from every chat
+## Your six tasks (26 points; details and grading in [docs/TASK.md](docs/TASK.md))
+You write the **integration**; the building blocks are provided (`users.py`, `story.py`, `kb.stats`, `kb.delete_document`).
+1. **Define the agent**: the 15 tools, a dynamic prompt with the user's knowledge base, context and checkpointer wiring
+2. **Async**: no blocking calls inside the tools
+3. **SQLite chat memory**: define the checkpointer and integrate it in the app
+4. **Alembic migration + user management**: register, log in, `/me`, logout, delete account; one knowledge base per user, shared by all of their chats, invisible to others
+5. **Two tools with observability**: `kb_stats` and `story_diagram` (Graphviz), each with a metric and a structured log line
+6. **Manage the knowledge base with tools**: `delete_document`, `update_document`
 
 ## What you need on your computer
 | Tool | Check | Install |
@@ -67,13 +70,15 @@ If port 6333 is taken on your machine: `QDRANT_PORT=6335 docker compose up -d`.
 | Path | What |
 |---|---|
 | `src/app/` | **the only place you edit** (plus this README and `.gitignore`) |
-| `src/app/custom_tools.py` | task 1: your tool goes here |
-| `src/app/assessment.json` | task 2: you declare your tool, metric and log event for the grader |
+| `src/app/custom_tools.py` | tasks 5 and 6: your four tools |
+| `src/app/main.py` | tasks 3 and 4: lifespan, users and auth endpoints |
+| `src/app/migrations/` | task 4.1: your Alembic migration |
 | `src/app/persistence.py` | task 3: chat memory (checkpointer) |
+| `src/app/users.py`, `src/app/story.py` | provided building blocks |
 | `src/app/kb/` | the knowledge base: extract text (OCR), sections, embeddings, Qdrant store, tools |
 | `src/app/agent.py` | the agent, its prompt, the tool list |
 | `src/app/telemetry.py` | metrics, structured logs, the LangChain callback |
-| `src/app/dashboards/` | task 2: your Grafana dashboard JSON |
+| `src/app/dashboards/` | task 5.3: your Grafana dashboard JSON |
 | everything else | **locked**: tests, Docker files, observability config, UI. Changing it makes your submission invalid |
 
 ## Your development loop

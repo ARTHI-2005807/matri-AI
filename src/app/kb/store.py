@@ -143,7 +143,7 @@ class KnowledgeBase:
         """What the agent sees on every turn: a compact description of this session's knowledge base."""
         docs, prof = self.documents(session_id), self.get_profile(session_id)
         if not docs:
-            return "KNOWLEDGE BASE: empty (no documents uploaded in this session)."
+            return "KNOWLEDGE BASE: empty (no documents yet)."
         lines = [f"KNOWLEDGE BASE ({len(docs)} document{'s' if len(docs) != 1 else ''}, searchable with search_knowledge_base):"]
         if prof:
             lines += [f"Overview: {prof['overview']}", f"Keywords: {', '.join(prof['keywords'])}"]
@@ -168,6 +168,39 @@ class KnowledgeBase:
             if len(found) == 1:
                 return found[0]
         return None
+
+    def delete_document(self, kb_id: str, doc_id: str) -> bool:
+        """PROVIDED: remove ONE document from the knowledge base `kb_id` (vectors, row, and a profile rebuilt from what is left).
+        Blocking I/O: call it with asyncio.to_thread. Returns True if the document existed."""
+        with self._db() as db:
+            if not db.execute("SELECT 1 FROM documents WHERE session_id=? AND doc_id=?", (kb_id, doc_id)).fetchone():
+                return False
+            db.execute("DELETE FROM documents WHERE session_id=? AND doc_id=?", (kb_id, doc_id))
+        self.qdrant.delete(COLLECTION, models.FilterSelector(filter=models.Filter(must=[
+            models.FieldCondition(key="session_id", match=models.MatchValue(value=kb_id)),
+            models.FieldCondition(key="doc_id", match=models.MatchValue(value=doc_id))])))
+        left = self.documents(kb_id)
+        with self._db() as db:
+            if not left:
+                db.execute("DELETE FROM profiles WHERE session_id=?", (kb_id,))
+                return True
+        counts: dict[str, int] = {}
+        for d in left:
+            for k in d["keywords"]:
+                counts[k.lower()] = counts.get(k.lower(), 0) + 1
+        prof = self.get_profile(kb_id) or {"overview": "", "keywords": []}
+        self.save_profile(kb_id, prof["overview"], sorted(counts, key=counts.get, reverse=True)[:15])
+        return True
+
+    def stats(self, kb_id: str) -> dict:
+        """PROVIDED: {"documents": n, "sections": n, "chunks": n, "keywords": [most common first, lowercased]} for one knowledge base."""
+        docs = self.documents(kb_id)
+        counts: dict[str, int] = {}
+        for d in docs:
+            for k in d["keywords"]:
+                counts[k.lower()] = counts.get(k.lower(), 0) + 1
+        return {"documents": len(docs), "sections": sum(d["n_sections"] for d in docs), "chunks": sum(d["n_chunks"] for d in docs),
+                "keywords": sorted(counts, key=counts.get, reverse=True)}
 
     def reset(self, session_id: str) -> None:
         self.qdrant.delete(COLLECTION, models.FilterSelector(filter=models.Filter(must=[

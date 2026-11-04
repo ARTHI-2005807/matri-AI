@@ -14,7 +14,10 @@ docker build -q --target runner -t eval-app-local . >/dev/null || { echo -e "${R
 docker build -q --target test -t eval-test-local . >/dev/null || { echo -e "${RED}[eval]${NC} test image failed to build"; exit 1; }
 
 rm -rf results && mkdir -p results
+python3 scripts/check_async.py
 docker volume create "$VOLUME" >/dev/null
+info "alembic round trip (upgrade, downgrade, upgrade)"
+docker run --rm -v "$VOLUME:/data" eval-app-local python scripts/check_migration.py > results/migration.json || echo '{}' > results/migration.json
 docker run -d --name "$CONTAINER" --memory 1g --cpus 1 -p "$PORT:8000" -v "$VOLUME:/data" eval-app-local >/dev/null
 
 wait_health() {

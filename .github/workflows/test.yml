@@ -38,10 +38,19 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Start app container
+      - name: Static async check (task 2)
+        run: |
+          mkdir -p results
+          python3 scripts/check_async.py
+
+      - name: Alembic migration round trip (task 4.1)
         run: |
           mkdir -p results
           docker volume create eval-data
+          docker run --rm -v eval-data:/data eval-app:ci python scripts/check_migration.py | tee results/migration.json || echo '{}' > results/migration.json
+
+      - name: Start app container
+        run: |
           docker run -d --name eval-app --memory 1g --cpus 1 -p 8000:8000 -v eval-data:/data eval-app:ci
 
       - name: Wait for /health

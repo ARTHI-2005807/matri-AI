@@ -7,6 +7,7 @@ checkpointer and knowledge base without an API key:
     search <query>            -> calls search_knowledge_base(query=<query>)
     call <tool> <json args>   -> calls any registered tool with those arguments
     recall                    -> answers with every earlier user message in this thread (proves chat memory)
+    showprompt                -> answers with the system prompt the model was given (proves the dynamic prompt)
     anything else             -> "ok: <text>"
 After a tool runs, the model answers "Tool result: <tool output>".
 """
@@ -16,7 +17,7 @@ import uuid
 from typing import Any
 
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.runnables import RunnableLambda
 
@@ -55,6 +56,8 @@ class ScriptedChatModel(BaseChatModel):
             except json.JSONDecodeError:
                 return AIMessage(content="Could not parse the tool arguments as JSON.")
             return _tool_call(name.strip(), args)
+        if word == "showprompt":
+            return AIMessage(content="SYSTEM PROMPT: " + "\n".join(str(m.content) for m in messages if isinstance(m, SystemMessage)))
         if word == "recall":
             return AIMessage(content="You said: " + " | ".join(humans[:-1]))
         return AIMessage(content=f"ok: {text[:200]}")

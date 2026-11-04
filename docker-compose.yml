@@ -16,12 +16,21 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317   # gRPC: host:port, no scheme
       AGENT_MAX_STEPS: "25"
     depends_on:
-      - qdrant
-      - notes-mcp
-      - otel-collector
+      migrate: { condition: service_completed_successfully }   # the users database must be migrated first
+      qdrant: { condition: service_started }
+      notes-mcp: { condition: service_started }
+      otel-collector: { condition: service_started }
     volumes:
       - app_data:/data
     restart: unless-stopped
+
+  migrate:   # one-shot task: applies your Alembic migrations (src/app/migrations) to /data/users.sqlite, then exits
+    build: { context: ., target: app }
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      KB_DB: /data/kb.sqlite
+    volumes:
+      - app_data:/data
 
   ui:   # Gradio: a plain API client (no agent code)
     build: { context: ., target: app }
