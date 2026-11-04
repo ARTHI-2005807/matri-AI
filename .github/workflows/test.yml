@@ -1,0 +1,119 @@
+name: evaluate
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify only src/app/ changed
+        run: bash scripts/check_protected.sh HEAD
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build app image (runner target)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runner
+          tags: eval-app:ci
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build test image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: test
+          tags: eval-test:ci
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Start app container
+        run: |
+          mkdir -p results
+          docker volume create eval-data
+          docker run -d --name eval-app --memory 1g --cpus 1 -p 8000:8000 -v eval-data:/data eval-app:ci
+
+      - name: Wait for /health
+        run: |
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8000/health && echo && exit 0
+            sleep 2
+          done
+          echo "::error::App did not become healthy within 120s"
+          docker logs eval-app
+          exit 1
+
+      - name: Tests, phase 1 (before restart)
+        id: phase1
+        continue-on-error: true
+        run: |
+          docker run --rm --network host \
+            -e BASE_URL=http://localhost:8000 \
+            -e ASSESSMENT_ID=agentic-ai-extension \
+            -e GITHUB_SHA=${{ github.sha }} \
+            -v ${{ github.workspace }}/results:/app/results \
+            eval-test:ci \
+            pytest tests/ -m phase1 --tb=short -q --junit-xml=results/phase1.xml
+
+      - name: Restart the app container (same data volume)
+        if: always()
+        run: |
+          docker restart eval-app
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8000/health >/dev/null && echo "App back after restart" && exit 0
+            sleep 2
+          done
+          echo "::error::App did not become healthy after the restart"
+          docker logs eval-app
+          exit 1
+
+      - name: Tests, phase 2 (after restart)
+        id: phase2
+        if: always()
+        continue-on-error: true
+        run: |
+          docker run --rm --network host \
+            -e BASE_URL=http://localhost:8000 \
+            -e ASSESSMENT_ID=agentic-ai-extension \
+            -e GITHUB_SHA=${{ github.sha }} \
+            -v ${{ github.workspace }}/results:/app/results \
+            eval-test:ci \
+            pytest tests/ -m phase2 --tb=short -q --junit-xml=results/phase2.xml
+
+      - name: Show the score
+        if: always()
+        run: |
+          python3 -c "import json;s=json.load(open('results/summary.json'));print(f\"{s['earnedPoints']}/{s['totalPoints']} points\");[print(('PASS' if c['passed'] else 'FAIL'), c['points'], c['id'], '-', c['name']) for c in s['checks']]" || true
+
+      - name: App log (last lines)
+        if: always()
+        run: docker logs --tail 60 eval-app || true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            results/summary.json
+            results/phase1.xml
+            results/phase2.xml
+
+      - name: Fail the run if any test failed
+        if: steps.phase1.outcome == 'failure' || steps.phase2.outcome == 'failure'
+        run: exit 1
+
+      - name: Stop app container
+        if: always()
+        run: docker rm -f eval-app || true
