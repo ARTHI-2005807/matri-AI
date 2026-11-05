@@ -20,6 +20,8 @@ You write the **integration**; the building blocks are provided (`users.py`, `ta
 6. **Manage the knowledge base with tools**: `delete_document`, `update_document`
 7. **Notes and tasks MCP server with per-user auth**: register the tools, check the bearer token in the server, forward it from the agent
 
+**About the red cross:** the GitHub run turns red until all 34 checks pass. That is intended. It still records your score (open the run's **Summary** tab); submit it anyway, partial points count and your best attempt is kept (see [docs/SUBMIT.md](docs/SUBMIT.md)).
+
 ## What you need on your computer
 | Tool | Check | Install |
 |---|---|---|

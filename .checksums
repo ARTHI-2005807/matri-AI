@@ -7,7 +7,7 @@ da01968c34c9ad507f89b7a2e31121b53720287d  data/northwind.sqlite
 3315861b007fc443f39d2fb52d0e43174f3fa9a3  docker-compose.yml
 2a2ddd120805888f40860e2f8991307cec6aeb9c  Dockerfile
 78687ab50455240de063ca9c56d5f82876adfc13  .dockerignore
-3939e6eff6ad076d40763e49fbafbb4b3bdf8afc  docs/SUBMIT.md
+0442825f1c257ee5d2254d622025af04a534cf4e  docs/SUBMIT.md
 d664979f3c06b99d53d3b8e04398d485f1c52bec  docs/TASK.md
 a379e810ba7bcf664b7d174b79aa76986c8bd80d  .env.example
 6313b56c57848efce05faa7aa7e901ccfc2886ea  .gitattributes

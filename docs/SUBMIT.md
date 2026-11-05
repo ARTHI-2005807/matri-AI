@@ -55,7 +55,7 @@ bash scripts/local_eval.sh       # the full autograder: scripted model, restart,
 git add -A && git commit -m "my solution" && git push origin main
 ```
 - Push to **`main`** only
-- Open the **Actions** tab, wait for the run named **evaluate** to finish (green tick or red cross are both fine; it takes about 5-10 minutes)
+- Open the **Actions** tab, wait for the run named **evaluate** to finish (green tick or red cross are both fine; it takes about 5-10 minutes; see **Why is my run red?** below)
 - The run's log shows your score and one PASS/FAIL line per check
 - Copy the run URL: `https://github.com/<you>/<repo>/actions/runs/<number>`
 
@@ -87,6 +87,14 @@ GitHub, then **Settings, Developer settings, Personal access tokens, Fine-graine
 
 ## Scoring
 The full table of the 34 checks (ids, points, what each one proves) is in `docs/TASK.md`. The email lists every check as PASS or FAIL.
+
+## Why is my run red?
+The last step of the **evaluate** run is called **Fail the run if any test failed**. It fails **on purpose** whenever your score is below 34/34, so the run shows a **red cross** until every check passes. A red run is not an error:
+- the tests still ran and your score was written (open the run's **Summary** tab: score, a table per task, and what to fix for each failed check)
+- **partial points are recorded**: submit the run URL through the form, red or green, and you get an email with your score
+- **your best score is kept**: fix a check, push, wait for the new run and submit its URL again; a higher score replaces the old one, a lower one never does
+- the run only turns **green** at 34/34
+A run that fails *before* the tests (for example the Docker build breaks) has no score: the email says "no test results". Fix the error shown in the failed step and push again.
 
 ## If something goes wrong
 The email says what failed. Common ones:
