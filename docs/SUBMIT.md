@@ -1,8 +1,8 @@
-# Agentic AI assessment: extend the Document Agent - how to submit
+# Agentic AI assessment: integrate the Document Agent - how to submit
 
 ## At a glance
 - Build: integrate the Document Agent: agent definition, async tools, SQLite chat memory, Alembic migration, user management with per-user knowledge bases, two new tools with observability, knowledge-base management tools, a notes and tasks MCP server with per-user auth (see `docs/TASK.md`)
-- Window: **the opening time your instructor announced** to **the closing time your instructor announced** (judged on when your GitHub Actions run finishes)
+- Window: **5 Nov 2026, 00:00 IST** to **12 Nov 2026, 23:59 IST** (judged on when your GitHub Actions run finishes)
 - Pass: **all 34 points** (every task is required; partial scores are recorded too)
 - You may submit as many times as you like; **your best score is kept**
 - Result arrives by **email** (check spam)
@@ -16,9 +16,10 @@
 ## Steps
 
 ### 1. Create your repo
-- Open the template repository link your instructor shared (named `matrimorphosis-agentic-ai-assessment`) then **Use this template** then **Create a new repository**
+- Open the template repository link your instructor shared (named `matrimorphosis-agentic-ai-assessment`; it is public) then **Use this template** then **Create a new repository**
 - Owner: **your own account** (not an organisation)
-- Visibility: **Private**
+- Visibility: **Private** (so other students cannot see your solution)
+- Use **Use this template**, **not Fork**: a fork of a public repository is always public, and GitHub Actions is switched off in forks
 - Clone it:
   ```bash
   git clone https://github.com/<you>/<your-repo>
@@ -37,7 +38,7 @@ uv run --only-group hooks pre-commit install
 ### 3. Write your solution
 - Edit **only `src/app/`** (`README.md` and `.gitignore` are also free)
 - Everything else is locked and compared with the template, byte for byte:
-  - `tests/`, `Dockerfile`, `pyproject.toml`, `uv.lock`, `docker-compose.yml`, `.env.example`, `.github/`, `scripts/`, `docs/`, `data/`, `samples/`, `ui/`, `mcp_server/`, `observability/`, `.pre-commit-config.yaml`, `.checksums`, `.gitattributes`
+  - `tests/`, `Dockerfile`, `pyproject.toml`, `uv.lock`, `docker-compose.yml`, `alembic.ini`, `alembic/`, `.env.example`, `.github/`, `scripts/`, `docs/`, `data/`, `samples/`, `ui/`, `observability/`, `.pre-commit-config.yaml`, `.checksums`, `.gitattributes`
 - Adding, deleting or changing any locked file makes the submission invalid
 - If a commit is blocked, the message lists the files; fix with:
   ```bash
@@ -56,7 +57,7 @@ git add -A && git commit -m "my solution" && git push origin main
 ```
 - Push to **`main`** only
 - Open the **Actions** tab, wait for the run named **evaluate** to finish (green tick or red cross are both fine; it takes about 5-10 minutes; see **Why is my run red?** below)
-- The run's log shows your score and one PASS/FAIL line per check
+- The run's **Summary** tab shows your score, a table per task and what to fix for each failed check
 - Copy the run URL: `https://github.com/<you>/<repo>/actions/runs/<number>`
 
 ### 6. Create a read-only token
@@ -115,4 +116,4 @@ The email says what failed. Common ones:
 An invalid submission records **no score** and never lowers an earlier one. Fix, push, and submit the new run URL.
 
 ## Contact
-Your instructor (the contact in the course channel).
+Contact your instructor.

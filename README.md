@@ -1,11 +1,11 @@
-# Agentic AI assessment: extend the Document Agent
+# Agentic AI assessment: integrate the Document Agent
 
 A working AI agent you run on **your own computer** with **your own free Groq API key**. It chats, uses tools
 (SQL, charts, web, OpenML), reads documents you upload (PDF, DOCX, text, scans), answers with citations, and sends
-logs, metrics and traces to Grafana. Your job: **extend it**, then push to GitHub. Automated tests grade your work.
+logs, metrics and traces to Grafana. Your job: **finish the integration** (seven tasks), then push to GitHub. Automated tests grade your work.
 
 ```
-Gradio UI :7860 --> FastAPI agent :8000 --> Groq (LLM) · Qdrant (vectors) · SQLite · MCP notes server
+Gradio UI :7860 --> FastAPI agent :8000 --> Groq (LLM) · Qdrant (vectors) · SQLite · MCP notes and tasks server
                           |
                           +--> OpenTelemetry Collector --> Tempo (traces) · Prometheus (metrics) · Loki (logs) --> Grafana :3000
 ```
@@ -19,6 +19,13 @@ You write the **integration**; the building blocks are provided (`users.py`, `ta
 5. **Two tools with observability**: `kb_stats` and `document_outline`, each with a metric and a structured log line
 6. **Manage the knowledge base with tools**: `delete_document`, `update_document`
 7. **Notes and tasks MCP server with per-user auth**: register the tools, check the bearer token in the server, forward it from the agent
+
+## What you have to do (in short)
+1. **Set up** (below): your own private repo from the template, your Groq key, `bash scripts/check_setup.sh`, `docker compose up --build -d`.
+2. **Make the checks pass:** the app runs, but the seven tasks above are yours. You write only the integration (wiring, small wrappers, docstrings, one migration); the hard parts are provided. Start with task 1 and follow the order in [docs/TASK.md](docs/TASK.md).
+3. **Check yourself:** `bash scripts/local_eval.sh` runs the grader on your machine: your score and why each failed check fails.
+4. **Push to `main`:** the GitHub run **evaluate** grades you; open its **Summary** tab.
+5. **Submit the run URL and a read-only token** through the form before **12 Nov 2026, 23:59 IST** ([docs/SUBMIT.md](docs/SUBMIT.md)). Partial points count and your best attempt is kept.
 
 **About the red cross:** the GitHub run turns red until all 34 checks pass. That is intended. It still records your score (open the run's **Summary** tab); submit it anyway, partial points count and your best attempt is kept (see [docs/SUBMIT.md](docs/SUBMIT.md)).
 
@@ -63,6 +70,7 @@ Stop everything with `docker compose down`.
 If port 6333 is taken on your machine: `QDRANT_PORT=6335 docker compose up -d`.
 
 ### Try it (5 minutes)
+0. After task 4 the UI asks you to **register and log in** (Account box, right side); before that it works anonymously.
 1. In the UI, upload `samples/attention-is-all-you-need.pdf` and wait about a minute (it reads, splits into sections, embeds).
 2. Ask *"How does multi-head attention work?"*: the answer cites `[document › section, page]`.
 3. Ask *"Top 5 artists in the Chinook database as a bar chart"*: SQL + chart, no document search (see the **Steps** and **Chart** tabs).
@@ -74,7 +82,7 @@ If port 6333 is taken on your machine: `QDRANT_PORT=6335 docker compose up -d`.
 |---|---|
 | `src/app/` | **the only place you edit** (plus this README and `.gitignore`) |
 | `src/app/custom_tools.py` | tasks 5 and 6: your four tools |
-| `src/app/main.py` | tasks 3 and 4: lifespan, users and auth endpoints |
+| `src/app/main.py` | tasks 3, 4 and 7.4: lifespan, users and auth endpoints, the token in `Ctx` |
 | `src/app/migrations/` | task 4.1: your Alembic migration |
 | `src/app/persistence.py` | task 3: chat memory (checkpointer) |
 | `src/app/mcp_server/server.py` | task 7: the notes and tasks MCP server (storage provided) |
@@ -88,7 +96,7 @@ If port 6333 is taken on your machine: `QDRANT_PORT=6335 docker compose up -d`.
 ## Your development loop
 ```bash
 # edit src/app/...
-docker compose up -d --build api       # rebuild and restart the API (about 20 s once images are cached)
+docker compose up -d --build api notes-mcp   # rebuild and restart the API and the MCP server (about 20 s once images are cached)
 docker compose logs -f api             # JSON logs; Ctrl-C to leave
 curl localhost:8000/debug/telemetry    # metrics and recent log events your code recorded (what the grader reads)
 bash scripts/local_eval.sh             # the full autograder on your machine, exactly like GitHub (builds 2 images; a few minutes)
@@ -108,5 +116,7 @@ Push to `main`, wait for the GitHub Action, and submit the run URL: see **[docs/
 | Commit blocked: "Locked files differ" | you changed a locked file; the message shows the `git restore` command |
 | Ingestion is slow | a scanned page takes about 10-15 s (OCR); text PDFs take seconds. Use the small `samples/` files |
 | Grafana is empty | send some chat messages first; metrics appear within 10-20 s |
+| Task or note tools fail with `UNAUTHENTICATED` | log in first; then check the interceptor forwards the token (task 7.4) and `docker compose ps` shows `notes-mcp` running |
+| `/login` or MCP says a table does not exist | the migration did not run: `docker compose run --rm migrate` and look at its output |
 
-Use this file for your own notes: describe your tool, add a screenshot of your Grafana panel. It is not graded, but graders may read it.
+Use this file for your own notes: how you solved each task, a screenshot of your Grafana panel. It is not graded, but graders may read it.

@@ -11,6 +11,13 @@ You **integrate**: you do not write the hard parts, you wire them together. The 
 | `src/app/kb/pipeline.py`, `kb/files.py`, `errors.py` | `ingest_file`, upload resolution, `to_tool_exception` |
 | `alembic.ini`, `alembic/`, `docker-compose.yml` (`migrate` service) | the Alembic setup and the one-shot migrate task |
 
+## What you have to do (in short)
+1. **Set up:** create your own private repo from the template, clone it, add your Groq key, run `bash scripts/check_setup.sh` and `docker compose up --build -d` (see `README.md`).
+2. **Make the checks pass.** The app runs, but the seven tasks below are yours: define the agent, make the tools async, add SQLite chat memory, write the Alembic migration and user management, write four tools, and build the notes and tasks MCP server with per-user auth. You write only the **integration** (wiring, small wrappers, docstrings); the hard parts are provided.
+3. **Check yourself:** `bash scripts/local_eval.sh` runs the grader on your machine and prints your score and why each failed check fails.
+4. **Push to `main`:** the GitHub run named **evaluate** grades you. It is red until you have all 34 points; open its **Summary** tab for the score and what to fix.
+5. **Submit the run URL** and a read-only token through the form before **12 Nov 2026, 23:59 IST** (steps in `docs/SUBMIT.md`). Partial points count and your best attempt is kept, so submit early and again after each improvement.
+
 The autograder runs on every push to `main` with a scripted model (no API key needed on GitHub), so results are deterministic.
 Run it yourself first: `bash scripts/local_eval.sh`. The Gradio UI (`docker compose up`, http://localhost:7860) works as soon as the
 tasks are done: register, log in, upload, chat, list and delete documents, ask how a document is organised, manage your tasks and notes.
@@ -32,10 +39,10 @@ A blocking call inside a tool freezes every other request. Convert `get_weather`
 - **3.1 define and integrate (1):** `open_checkpointer()` yields an `AsyncSqliteSaver` on `CHECKPOINT_DB` (make the folder); the `lifespan` in `main.py` opens it, passes it to `build_agent`, keeps it open until shutdown. A thread remembers; another thread does not.
 - **3.2 survives a restart (1):** the grader restarts the container with the same volume and asks the thread again.
 
-## Task 4: migration, users, one knowledge base per user (7 points)
+## Task 4: migration, users, one knowledge base per user (9 points)
 - **4.1 Alembic migration (2) · `src/app/migrations/`:** write ONE migration (`alembic revision -m "create users"`) that creates the tables `users`, `tokens`, `threads` (columns in `users.py`) and drops them in `downgrade`. `docker compose` runs it in the `migrate` service before the API starts; CI runs `upgrade head`, `downgrade base`, `upgrade head` and checks the tables each time. Tables are created by the migration only, never by app code (`GET /debug/schema` shows the database and its revision).
 - **4.2 register and log in (1) · `main.py`:** `POST /users` (201; 409 taken; 422 invalid) and `POST /login` (200 with a token; 401). Use `UserStore` through `asyncio.to_thread`.
-- **4.3 account endpoints (2) · `main.py`:** `GET /me`, `POST /logout` (204, revokes only that token), `DELETE /users/me` (204; also `kb.reset(user_id)`); a FastAPI dependency turns `Authorization: Bearer <token>` into the current user and answers **401** otherwise. Protect `/agent`, `/upload`, `GET`/`DELETE /kb/{session_id}`, `/me`, `/logout`, `/users/me`.
+- **4.3 account endpoints (3) · `main.py`:** `GET /me`, `POST /logout` (204, revokes only that token), `DELETE /users/me` (204; also `kb.reset(user_id)`); a FastAPI dependency turns `Authorization: Bearer <token>` into the current user and answers **401** otherwise. Protect `/agent`, `/upload`, `GET`/`DELETE /kb/{session_id}`, `/me`, `/logout`, `/users/me`.
 - **4.4 one knowledge base per user (1):** add `user_id` to `Ctx`; `/agent` passes `Ctx(session_id=..., user_id=...)`; ingest, search, the dynamic prompt and `/kb/...` use the **user id** as the knowledge-base id. All chats of one user share it. Uploaded files stay in the chat folder.
 - **4.5 isolation (1):** another user sees none of it. A chat `thread_id` belongs to the first user who uses it (`claim_thread`): `/agent` and `/upload` on someone else's thread answer **403**.
 - **4.6 survives a restart (1):** users, tokens, thread claims and knowledge bases are on the volume (SQLite + Qdrant under `/data`).
