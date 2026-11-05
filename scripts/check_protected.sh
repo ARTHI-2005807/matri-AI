@@ -32,10 +32,10 @@ problems=$(awk -F'  ' '
     }' <(printf '%s\n' "$expected") <(printf '%s\n' "$actual") | sort)
 
 if [ -n "$problems" ]; then
-    echo "[eval] Locked files differ from the template (only src/app/, README.md, .gitignore are editable):"
+    echo "[eval] Locked files differ from the template (only the files listed in docs/TASK.md, README.md and .gitignore are editable):"
     echo "$problems"
     echo ""
-    echo "[eval] Only edit files inside src/app/. To fix:"
+    echo "[eval] Only edit the files listed in docs/TASK.md. To fix:"
     echo "         modified/missing -> git restore --staged --worktree <file>"
     echo "         not allowed      -> git rm -f --cached <file> (and delete it)"
     exit 1

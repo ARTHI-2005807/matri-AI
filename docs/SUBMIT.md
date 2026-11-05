@@ -1,7 +1,7 @@
 # Agentic AI assessment: integrate the Document Agent - how to submit
 
 ## At a glance
-- Build: integrate the Document Agent: agent definition, async tools, SQLite chat memory, Alembic migration, user management with per-user knowledge bases, two new tools with observability, knowledge-base management tools, a notes and tasks MCP server with per-user auth (see `docs/TASK.md`)
+- Build: integrate the Document Agent: nine tasks in order, 34 points (see `docs/TASK.md`)
 - Window: **5 Nov 2026, 00:00 IST** to **12 Nov 2026, 23:59 IST** (judged on when your GitHub Actions run finishes)
 - Pass: **all 34 points** (every task is required; partial scores are recorded too)
 - You may submit as many times as you like; **your best score is kept**
@@ -36,7 +36,7 @@ uv run --only-group hooks pre-commit install
 - In a hurry? `git push --no-verify` skips the local run; the GitHub Action is the real grader
 
 ### 3. Write your solution
-- Edit **only `src/app/`** (`README.md` and `.gitignore` are also free)
+- Edit **only the files listed in `docs/TASK.md`** (nine files under `src/app/`, plus new files in `src/app/migrations/` and `src/app/dashboards/`; `README.md` and `.gitignore` are also free)
 - Everything else is locked and compared with the template, byte for byte:
   - `tests/`, `Dockerfile`, `pyproject.toml`, `uv.lock`, `docker-compose.yml`, `alembic.ini`, `alembic/`, `.env.example`, `.github/`, `scripts/`, `docs/`, `data/`, `samples/`, `ui/`, `observability/`, `.pre-commit-config.yaml`, `.checksums`, `.gitattributes`
 - Adding, deleting or changing any locked file makes the submission invalid
@@ -80,11 +80,13 @@ GitHub, then **Settings, Developer settings, Personal access tokens, Fine-graine
 
 ## What gets checked
 - The run is from the official **evaluate** workflow, a **push to `main`** of **your** repo
-- Every locked file (everything except `src/app/`, `README.md`, `.gitignore`) equals the template at that commit
+- Every locked file (everything except the files you may edit, see `docs/TASK.md`) equals the template at that commit
 - The run finished inside the window
 - Test results belong to this assessment and to the same commit
 - One GitHub account per Google email (do not share repos or tokens)
-- Solutions are compared across students; matching code is flagged for review
+- Solutions are compared automatically across students
+- Your code must not detect or special-case the grader (`LLM_MODE`, `ASSESSMENT_DEBUG` and the like): `scripts/check_integrity.py` sets the score to 0 if it does
+- **There is no manual review: your grade is the score of the CI run**
 
 ## Scoring
 The full table of the 34 checks (ids, points, what each one proves) is in `docs/TASK.md`. The email lists every check as PASS or FAIL.
@@ -108,7 +110,7 @@ The email says what failed. Common ones:
 | Run not finished | wait for the green tick or red cross, then resubmit |
 | Not from the official workflow | submit the **evaluate** run; do not add or edit `.github/workflows/` |
 | Not a normal push to main | push to `main`; do not use manual or pull-request runs |
-| Files outside src/app/ changed | restore the listed files, push, submit the **new** run |
+| Locked files changed | restore the listed files, push, submit the **new** run |
 | Outside the submission window | contact the instructor |
 | No test results | re-run the workflow, then submit the new run |
 | Account already registered with another email | use your original Google account, or contact the instructor |

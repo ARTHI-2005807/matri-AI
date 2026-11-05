@@ -7,8 +7,9 @@ import sys
 from pathlib import Path
 
 RESULTS = Path(__file__).resolve().parent.parent / "results"
-TASKS = {"1": "Define the agent", "2": "Async tools", "3": "Chat memory (SQLite)", "4": "Migration, users, per-user knowledge base",
-         "5": "Two tools and observability", "6": "Manage the knowledge base with tools", "7": "Notes and tasks MCP server"}
+TASKS = {"1": "Define the agent", "2": "Async tools", "3": "Chat memory (SQLite)", "4": "Alembic migration", "5": "User accounts and auth",
+         "6": "One knowledge base per user", "7": "Two tools and observability", "8": "Manage the knowledge base with tools",
+         "9": "Notes and tasks MCP server"}
 
 
 def main() -> int:
@@ -20,7 +21,12 @@ def main() -> int:
     details = json.loads((RESULTS / "details.json").read_text()) if (RESULTS / "details.json").exists() else {}
     earned, total = s["earnedPoints"], s["totalPoints"]
     filled = round(20 * earned / total) if total else 0
-    out = [f"## Score: {earned} / {total} points", "", f"`{'#' * filled}{'-' * (20 - filled)}` {round(100 * earned / total) if total else 0}%", ""]
+    integrity = json.loads((RESULTS / "integrity.json").read_text()) if (RESULTS / "integrity.json").exists() else {"ok": True, "problems": []}
+    out = []
+    if not integrity["ok"]:
+        out += ["## Score set to 0: your code detects or special-cases the grader", "", "Remove these, push, and submit the new run (your best score is kept):", ""]
+        out += [f"- `{p}`" for p in integrity["problems"]] + [""]
+    out += [f"## Score: {earned} / {total} points", "", f"`{'#' * filled}{'-' * (20 - filled)}` {round(100 * earned / total) if total else 0}%", ""]
     out.append("**All tests passed. You can submit this run.**" if earned == total else
                "**Not all points yet.** The run shows a red cross until every check passes; your score is recorded either way and your best attempt counts.")
     for num, title in TASKS.items():

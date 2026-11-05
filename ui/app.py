@@ -1,6 +1,6 @@
 """Gradio front end. It is a pure API client: everything goes through the FastAPI service (no agent code here).
 
-Accounts (task 4): register / log in on the right; the token travels as `Authorization: Bearer <token>`. Until your API has
+Accounts (task 5): register / log in on the right; the token travels as `Authorization: Bearer <token>`. Until your API has
 POST /users the UI works anonymously, so you always have something to click."""
 import os
 import uuid
@@ -125,7 +125,7 @@ def account(action: str, username: str, password: str, tok: str, sid: str):
         if action == "register":
             r = http.post("/users", json={"username": username, "password": password})
             if r.status_code == 404:
-                return tok, "The API has no user management yet (task 4): you are anonymous.", sid, gr.update(), gr.update()
+                return tok, "The API has no user management yet (task 5): you are anonymous.", sid, gr.update(), gr.update()
             if r.status_code != 201:
                 return tok, f"Register failed: {detail(r)}", sid, gr.update(), gr.update()
         r = http.post("/login", json={"username": username, "password": password})

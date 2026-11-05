@@ -42,14 +42,15 @@ jobs:
         run: |
           mkdir -p results
           python3 scripts/check_async.py
+          python3 scripts/check_integrity.py
 
-      - name: Alembic migration round trip (task 4.1)
+      - name: Alembic migration round trip (task 4)
         run: |
           mkdir -p results
           docker volume create eval-data
           docker run --rm -v eval-data:/data eval-app:ci python scripts/check_migration.py | tee results/migration.json || echo '{}' > results/migration.json
 
-      - name: Start the MCP server (notes and tasks, task 7) and the app
+      - name: Start the MCP server (notes and tasks, task 9) and the app
         run: |
           docker run -d --name eval-mcp --network host -v eval-data:/data eval-app:ci python src/app/mcp_server/server.py --http
           for i in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/9000) 2>/dev/null && break; sleep 1; done

@@ -1,4 +1,4 @@
-"""PROVIDED (task 4): the user store. You do not write this file; you wire it into the app (see main.py) and write the migration.
+"""PROVIDED (tasks 5 and 6): the user store. You do not write this file; you wire it into the app (see main.py) and write the migration.
 
 Every user owns ONE knowledge base that all of their chats share; nobody else can see it. The HTTP contract (the autograder checks it):
 

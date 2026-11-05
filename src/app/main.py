@@ -1,4 +1,3 @@
-import sqlite3
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -10,7 +9,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 
 from app.telemetry import (  # first: providers must exist before LangChain runs
-    DEBUG, LOG_BUFFER, metrics_snapshot, RUN_STEPS, HTTP_DURATION, HTTP_REQUESTS, configure_logging, log, run_config, setup_telemetry,
+    RUN_STEPS, HTTP_DURATION, HTTP_REQUESTS, configure_logging, log, run_config, setup_telemetry,
     shutdown_telemetry,
 )
 
@@ -19,6 +18,7 @@ configure_logging()
 HTTPXClientInstrumentor().instrument()  # outgoing HTTP (URL ingestion, Groq) becomes child spans
 
 from app.agent import build_agent, charts_from, clean_answer, steps_from
+from app.debug_routes import install_routes
 from app.context import Ctx
 from app.errors import DocError, http_status
 from app.kb import files
@@ -45,6 +45,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Agentic AI assessment - Document Agent (tools + knowledge base + MCP)", lifespan=lifespan)
 FastAPIInstrumentor.instrument_app(app, excluded_urls="health,metrics")
 app.mount("/charts", StaticFiles(directory=str(CHARTS_DIR)), name="charts")
+install_routes(app)  # PROVIDED: /health and the /debug/* endpoints the grader reads (src/app/debug_routes.py, locked)
 
 
 @app.middleware("http")
@@ -70,15 +71,11 @@ async def observe(request: Request, call_next):
                      duration_ms=round(elapsed * 1000))
 
 
-# TODO(task 4): users and authentication. See users.py for the contract. In short: POST /users, POST /login, GET /me, POST /logout,
-#   DELETE /users/me, a FastAPI dependency that turns `Authorization: Bearer <token>` into the current user (401 otherwise) and is used by /agent, /upload and /kb;
-#   /agent passes context=Ctx(session_id=..., user_id=..., token=<the bearer token>) (task 7.3 forwards the token to the MCP server);
-#   a thread belongs to its first user (403 for anybody else).
-
-
-@app.get("/health")
-async def health(request: Request):
-    return {"status": "ok", "tools": request.app.state.tool_names}
+# TODO(task 5): accounts. See users.py for the contract: POST /users, POST /login, GET /me, POST /logout, DELETE /users/me, and a
+#   FastAPI dependency that turns `Authorization: Bearer <token>` into the current user (401 otherwise), used by /agent, /upload and /kb.
+# TODO(task 6): one knowledge base per user. /agent passes context=Ctx(session_id=..., user_id=...); a chat thread belongs to the first
+#   user who uses it (claim_thread; 403 for anybody else).
+# TODO(task 9): /agent also puts the bearer token into Ctx (token=...), so the MCP calls can run as that user.
 
 
 @app.post("/agent", response_model=AgentResponse)
@@ -138,30 +135,3 @@ async def _guard(awaitable):
         log.error("request_failed", error_type=type(exc).__name__, error=str(exc)[:1000])
         status, message, headers = http_status(exc)  # safe text: no internals leak to the client
         raise HTTPException(status_code=status, detail=message, headers=headers) from exc
-
-
-if DEBUG:  # ASSESSMENT_DEBUG=1: what the autograder (and you) can inspect
-
-    @app.get("/debug/telemetry")
-    async def debug_telemetry():
-        """Metrics recorded so far (in memory) and the most recent structured log events."""
-        return {"metrics": metrics_snapshot(), "logs": list(LOG_BUFFER)[-300:]}
-
-    @app.get("/debug/tools")
-    async def debug_tools(request: Request):
-        """Every registered tool and whether it is async (has a coroutine): the autograder checks the async conversion here."""
-        return [{"name": t.name, "async": getattr(t, "coroutine", None) is not None} for t in request.app.state.tools]
-
-    @app.get("/debug/schema")
-    async def debug_schema():
-        """Tables and columns of the users database and the Alembic revision it is at (the autograder checks your migration here)."""
-        from app.users import users_db_path
-
-        con = sqlite3.connect(users_db_path())
-        try:
-            tables = {t: [r[1] for r in con.execute(f'PRAGMA table_info("{t}")')]
-                      for (t,) in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-            revision = [r[0] for r in con.execute("SELECT version_num FROM alembic_version")] if "alembic_version" in tables else []
-        finally:
-            con.close()
-        return {"tables": tables, "alembic_revision": revision}

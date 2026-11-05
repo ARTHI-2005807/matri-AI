@@ -2,7 +2,7 @@
 
 A working AI agent you run on **your own computer** with **your own free Groq API key**. It chats, uses tools
 (SQL, charts, web, OpenML), reads documents you upload (PDF, DOCX, text, scans), answers with citations, and sends
-logs, metrics and traces to Grafana. Your job: **finish the integration** (seven tasks), then push to GitHub. Automated tests grade your work.
+logs, metrics and traces to Grafana. Your job: **finish the integration** (nine tasks), then push to GitHub. Automated tests grade your work.
 
 ```
 Gradio UI :7860 --> FastAPI agent :8000 --> Groq (LLM) · Qdrant (vectors) · SQLite · MCP notes and tasks server
@@ -10,22 +10,11 @@ Gradio UI :7860 --> FastAPI agent :8000 --> Groq (LLM) · Qdrant (vectors) · SQ
                           +--> OpenTelemetry Collector --> Tempo (traces) · Prometheus (metrics) · Loki (logs) --> Grafana :3000
 ```
 
-## Your seven tasks (34 points; details and grading in [docs/TASK.md](docs/TASK.md))
-You write the **integration**; the building blocks are provided (`users.py`, `taskstore.py`, `kb.stats`, `kb.outline`, `kb.delete_document`).
-1. **Define the agent**: the 21 tools, a dynamic prompt with the user's knowledge base, context and checkpointer wiring
-2. **Async**: no blocking calls inside the tools
-3. **SQLite chat memory**: define the checkpointer and integrate it in the app
-4. **Alembic migration + user management**: register, log in, `/me`, logout, delete account; one knowledge base per user, shared by all of their chats, invisible to others
-5. **Two tools with observability**: `kb_stats` and `document_outline`, each with a metric and a structured log line
-6. **Manage the knowledge base with tools**: `delete_document`, `update_document`
-7. **Notes and tasks MCP server with per-user auth**: register the tools, check the bearer token in the server, forward it from the agent
+## What you have to do
+Nine tasks, in order, 34 points: **[docs/TASK.md](docs/TASK.md)** (what to do, which files, how it is graded). Submit with **[docs/SUBMIT.md](docs/SUBMIT.md)**
+before **12 Nov 2026, 23:59 IST**. You write only the integration; the hard parts are provided. This README is the setup guide.
 
-## What you have to do (in short)
-1. **Set up** (below): your own private repo from the template, your Groq key, `bash scripts/check_setup.sh`, `docker compose up --build -d`.
-2. **Make the checks pass:** the app runs, but the seven tasks above are yours. You write only the integration (wiring, small wrappers, docstrings, one migration); the hard parts are provided. Start with task 1 and follow the order in [docs/TASK.md](docs/TASK.md).
-3. **Check yourself:** `bash scripts/local_eval.sh` runs the grader on your machine: your score and why each failed check fails.
-4. **Push to `main`:** the GitHub run **evaluate** grades you; open its **Summary** tab.
-5. **Submit the run URL and a read-only token** through the form before **12 Nov 2026, 23:59 IST** ([docs/SUBMIT.md](docs/SUBMIT.md)). Partial points count and your best attempt is kept.
+**Please also try your agent with your own Groq key.** The autograder runs a scripted model and never calls Groq, so it cannot tell you how your agent behaves for real. Run it with your key (`docker compose up`, then the UI at http://localhost:7860) and chat with it: upload a document, ask for an outline, add a task. That is for your own benefit and is not graded. **The final grade is the score of the CI run only; there is no manual review of your code.**
 
 **About the red cross:** the GitHub run turns red until all 34 checks pass. That is intended. It still records your score (open the run's **Summary** tab); submit it anyway, partial points count and your best attempt is kept (see [docs/SUBMIT.md](docs/SUBMIT.md)).
 
@@ -70,7 +59,7 @@ Stop everything with `docker compose down`.
 If port 6333 is taken on your machine: `QDRANT_PORT=6335 docker compose up -d`.
 
 ### Try it (5 minutes)
-0. After task 4 the UI asks you to **register and log in** (Account box, right side); before that it works anonymously.
+0. After task 5 the UI asks you to **register and log in** (Account box, right side); before that it works anonymously.
 1. In the UI, upload `samples/attention-is-all-you-need.pdf` and wait about a minute (it reads, splits into sections, embeds).
 2. Ask *"How does multi-head attention work?"*: the answer cites `[document › section, page]`.
 3. Ask *"Top 5 artists in the Chinook database as a bar chart"*: SQL + chart, no document search (see the **Steps** and **Chart** tabs).
@@ -78,20 +67,9 @@ If port 6333 is taken on your machine: `QDRANT_PORT=6335 docker compose up -d`.
 5. Open Grafana: API hits, tokens per model, tool calls, ingest latency, logs. Click a log line's `trace_id` to jump to the trace.
 
 ## Where things are
-| Path | What |
-|---|---|
-| `src/app/` | **the only place you edit** (plus this README and `.gitignore`) |
-| `src/app/custom_tools.py` | tasks 5 and 6: your four tools |
-| `src/app/main.py` | tasks 3, 4 and 7.4: lifespan, users and auth endpoints, the token in `Ctx` |
-| `src/app/migrations/` | task 4.1: your Alembic migration |
-| `src/app/persistence.py` | task 3: chat memory (checkpointer) |
-| `src/app/mcp_server/server.py` | task 7: the notes and tasks MCP server (storage provided) |
-| `src/app/users.py`, `src/app/mcp_server/taskstore.py` | provided building blocks |
-| `src/app/kb/` | the knowledge base: extract text (OCR), sections, embeddings, Qdrant store, tools |
-| `src/app/agent.py` | tasks 1 and 7.4: the agent, its prompt, the tool list, the MCP token interceptor |
-| `src/app/telemetry.py` | metrics, structured logs, the LangChain callback |
-| `src/app/dashboards/` | task 5.3: your Grafana dashboard JSON |
-| everything else | **locked**: tests, Docker files, observability config, UI. Changing it makes your submission invalid |
+- You edit **nine files under `src/app/`** (listed in `docs/TASK.md`, one column per task), plus new files in `src/app/migrations/` and `src/app/dashboards/`, this README and `.gitignore`.
+- `src/app/users.py`, `src/app/mcp_server/taskstore.py`, `src/app/kb/store.py` are provided building blocks: read their docstrings.
+- Everything else is **locked**, including the rest of `src/app/` (fake model, telemetry, debug routes), tests, Docker files, observability config and UI. Changing it makes your submission invalid.
 
 ## Your development loop
 ```bash
@@ -116,7 +94,7 @@ Push to `main`, wait for the GitHub Action, and submit the run URL: see **[docs/
 | Commit blocked: "Locked files differ" | you changed a locked file; the message shows the `git restore` command |
 | Ingestion is slow | a scanned page takes about 10-15 s (OCR); text PDFs take seconds. Use the small `samples/` files |
 | Grafana is empty | send some chat messages first; metrics appear within 10-20 s |
-| Task or note tools fail with `UNAUTHENTICATED` | log in first; then check the interceptor forwards the token (task 7.4) and `docker compose ps` shows `notes-mcp` running |
+| Task or note tools fail with `UNAUTHENTICATED` | log in first; then check the interceptor forwards the token (task 9) and `docker compose ps` shows `notes-mcp` running |
 | `/login` or MCP says a table does not exist | the migration did not run: `docker compose run --rm migrate` and look at its output |
 
 Use this file for your own notes: how you solved each task, a screenshot of your Grafana panel. It is not graded, but graders may read it.

@@ -1,11 +1,11 @@
-"""Task 7: the notes and tasks MCP server. Run by docker compose / CI as:  python src/app/mcp_server/server.py --http  (port 9000, path /mcp)
+"""Task 9: the notes and tasks MCP server. Run by docker compose / CI as:  python src/app/mcp_server/server.py --http  (port 9000, path /mcp)
 
 The storage is PROVIDED (taskstore.py: TaskStore), the user lookup is PROVIDED (app/users.py: UserStore.user_for_token).
 You write the integration: register the eight tools below on `mcp`, and make every call run AS THE CALLING USER.
 
-How the server knows the user (task 7.2)
+How the server knows the user (task 9)
   The agent forwards the logged-in user's token on every MCP call as the HTTP header  Authorization: Bearer <token>  (you write that
-  half in agent.py, task 7.3). A tool declares a `ctx: Context` parameter; FastMCP injects it and the HTTP request is
+  half in agent.py, task 9). A tool declares a `ctx: Context` parameter; FastMCP injects it and the HTTP request is
   ctx.request_context.request (Starlette: .headers). Write ONE helper `current_user_id(ctx) -> str` that
     - reads the bearer token, looks it up with UserStore().user_for_token(token)
     - raises ToolError("ERROR[UNAUTHENTICATED]: <what>. Next step: log in and retry.") when the header is missing, malformed or unknown
@@ -31,8 +31,8 @@ from app.users import UserStore  # noqa: F401
 mcp = FastMCP("tasks", host="0.0.0.0", port=int(os.getenv("MCP_PORT", "9000")))
 store = TaskStore()
 
-# TODO(task 7.1): the eight tools (@mcp.tool())
-# TODO(task 7.2): current_user_id(ctx), used by every tool
+# TODO(task 9): the eight tools (@mcp.tool())
+# TODO(task 9): current_user_id(ctx), used by every tool
 
 
 if __name__ == "__main__":

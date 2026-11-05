@@ -1,4 +1,4 @@
-"""PROVIDED (task 7): notes and tasks for the MCP server, one private list per user, in SQLite (MCP_DB, default next to KB_DB).
+"""PROVIDED (task 9): notes and tasks for the MCP server, one private list per user, in SQLite (MCP_DB, default next to KB_DB).
 
 Plain Python, no MCP, no auth: the server (server.py) works out WHO is calling and passes `user_id`; every method only ever
 touches that user's rows (another user's id behaves like 'not found', so nothing leaks). Blocking sqlite3: the MCP tools are

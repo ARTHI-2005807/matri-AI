@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Runs INSIDE the app image, on the CI data volume, before the API starts (task 4.1). Prints one JSON object:
+"""Runs INSIDE the app image, on the CI data volume, before the API starts (task 4). Prints one JSON object:
 upgrade -> tables exist, downgrade -> tables gone, upgrade again -> tables back. Needs only alembic + the stdlib."""
 import json
 import os

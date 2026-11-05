@@ -4,7 +4,7 @@ phase1 runs first; then the CI restarts your container; then phase2 checks that 
 Run them yourself against `docker compose up`:   BASE_URL=http://localhost:8000 uv run pytest tests/ -m phase1
 (the restart-dependent tests need the restart too: `bash scripts/local_eval.sh` does the whole thing exactly like CI)
 
-Until you implement task 4, POST /users does not exist: the other tests then run as an anonymous user, so each task is graded on its own.
+Until you implement task 5, POST /users does not exist: the other tests then run as an anonymous user, so each task is graded on its own.
 """
 import ast
 import json
@@ -24,6 +24,8 @@ REQUIRED_TOOLS = {"get_weather", "web_fetch", "sql_query", "make_chart", "openml
                   "add_task", "list_tasks", "set_task_status", "delete_task", "task_summary", "delete_note",
                   "kb_stats", "document_outline", "delete_document", "update_document"}
 MCP_URL = os.getenv("MCP_URL", "http://localhost:9000/mcp")
+BUILT_IN_TOOLS = {"get_weather", "web_fetch", "sql_query", "make_chart", "openml_search", "openml_download", "pandas_query",
+                  "ingest_document", "search_knowledge_base"}
 ASYNC_TOOLS = ["get_weather", "web_fetch", "sql_query", "search_knowledge_base"]
 PASSWORD = "correct-horse-battery"
 
@@ -34,7 +36,7 @@ def rand() -> str:
 
 # ------------------------------------------------------------------ users and requests
 def new_user(client) -> dict:
-    """Registers and logs in a fresh user. If the API has no /users yet (task 4 not done) the user is anonymous (no headers)."""
+    """Registers and logs in a fresh user. If the API has no /users yet (task 5 not done) the user is anonymous (no headers)."""
     name = f"user_{rand()}"
     r = client.post("/users", json={"username": name, "password": PASSWORD})
     if r.status_code in (404, 405):
@@ -47,7 +49,7 @@ def new_user(client) -> dict:
 
 
 def need_users(user: dict) -> None:
-    assert not user["anonymous"], "task 4 is not done yet: POST /users does not exist"
+    assert not user["anonymous"], "task 5 is not done yet: POST /users does not exist"
 
 
 def ask(client, user: dict, thread: str, message: str, expect: int = 200) -> dict:
@@ -119,7 +121,7 @@ def save_state(**kw) -> None:
 @pytest.mark.phase1
 def test_agent_tools(client):
     tools = set(client.get("/health").json()["tools"])
-    assert tools == REQUIRED_TOOLS, f"missing: {sorted(REQUIRED_TOOLS - tools)}  unexpected: {sorted(tools - REQUIRED_TOOLS)}"
+    assert BUILT_IN_TOOLS <= tools, f"missing built-in tools: {sorted(BUILT_IN_TOOLS - tools)} (S1_TOOLS + build_kb_tools(kb), and also add await mcp_tools() and build_custom_tools(kb))"
 
 
 @pytest.mark.phase1
@@ -174,7 +176,7 @@ def test_memory_live(client):
     save_state(marker=marker, mem_thread=thread, mem_user=user)  # phase 2 asks again after the restart
 
 
-# ================================================================== task 4: migration, users, per-user knowledge base
+# ================================================================== tasks 4, 5, 6: migration, accounts, per-user knowledge base
 @pytest.mark.phase1
 def test_migration_roundtrip(client):
     path = RESULTS / "migration.json"
@@ -291,7 +293,7 @@ def test_user_isolation(client):
     save_state(iso_alice=alice, iso_bob=bob, iso_thread=thread, iso_token=token)
 
 
-# ================================================================== task 5: kb_stats, story_diagram
+# ================================================================== task 7: kb_stats, document_outline
 STATS_RE = re.compile(r"^(\d+) documents, (\d+) sections, (\d+) chunks\. Top keywords: (.+)\.$", re.S)
 
 
@@ -382,7 +384,7 @@ def test_outline_log(client):
     assert len(log_lines(client, "document_outline_done")) > before, "one log line per call, every call"
 
 
-# ================================================================== task 6: delete_document, update_document
+# ================================================================== task 8: delete_document, update_document
 @pytest.mark.phase1
 def test_delete_works(client):
     user, thread = new_user(client), f"del-{rand()}"
@@ -453,7 +455,7 @@ def test_update_errors(client):
     assert kb_docs(client, user, thread) == [name]
 
 
-# ================================================================== task 7: notes and tasks MCP server
+# ================================================================== task 9: notes and tasks MCP server
 def mcp_call(tool: str, args: dict, authorization: str | None = None) -> tuple[bool, str]:
     """Speaks MCP (streamable HTTP + JSON-RPC) straight to the server, like any MCP client. -> (is_error, text)."""
     headers = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}

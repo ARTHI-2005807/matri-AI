@@ -4,14 +4,14 @@ repos:
   - repo: local
     hooks:
       - id: protected-files
-        name: only src/app/ may change
+        name: only the files in docs/TASK.md may change
         entry: bash scripts/check_protected.sh
         language: system
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
       - id: protected-files-push
-        name: only src/app/ changed in this push
+        name: only the files in docs/TASK.md changed in this push
         entry: bash scripts/check_protected.sh HEAD
         language: system
         pass_filenames: false

@@ -15,6 +15,7 @@ docker build -q --target test -t eval-test-local-$$ . >/dev/null || { echo -e "$
 
 rm -rf results && mkdir -p results
 python3 scripts/check_async.py
+python3 scripts/check_integrity.py
 docker volume create "$VOLUME" >/dev/null
 info "alembic round trip (upgrade, downgrade, upgrade)"
 docker run --rm -v "$VOLUME:/data" eval-app-local-$$ python scripts/check_migration.py > results/migration.json || echo '{}' > results/migration.json
