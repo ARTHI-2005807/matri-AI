@@ -1,6 +1,6 @@
 """Tasks 5 and 6: four tools. Names, arguments, outputs, errors, metric and log names are FIXED (the autograder checks them).
 
-The heavy parts are PROVIDED (story.py: build_dot, kb/store.py: stats / delete_document, kb/pipeline.py: ingest_file).
+The heavy parts are PROVIDED (kb/store.py: stats / outline / delete_document, kb/pipeline.py: ingest_file).
 You write the tool wrappers: signature + docstring (the docstring is the prompt: say WHEN to use it, describe each argument),
 validation, ToolException with `ERROR[CODE]: what happened. Next step: what to do.`, the metric, the log line, `handle_tool_error = True`.
 All four are `async def` (blocking calls go through asyncio.to_thread). They act on the CALLING USER's knowledge base:
@@ -12,20 +12,26 @@ Look at kb/tools.py for the pattern (ToolRuntime, ToolException, handle_tool_err
           empty knowledge base: "The knowledge base is empty."
   error   top_keywords outside 1..20  ->  ERROR[INVALID_INPUT]
 
----------------------------------------------------------------------------------- task 5.2  story_diagram(title: str, nodes: list[str], edges: list[Edge] = []) -> str
-  output  exactly what story.build_dot returns (one fenced ```dot block). `Edge` is story.Edge.
-  errors  build_dot raises StoryError; its text is already `ERROR[CODE]: ... Next step: ...`: re-raise it as ToolException.
-  Use it when the user asks for a story, plot, timeline or process as a chart / diagram / flowchart.
+---------------------------------------------------------------------------------- task 5.2  document_outline(doc_name: str) -> str
+  The structure of one document: use it when the user asks what a document contains, how it is organised, or which section covers
+  something (then search that section). Resolve doc_name with kb.resolve_doc_name(user_id, doc_name), find the doc_id in
+  kb.documents(user_id), read the sections with kb.outline(user_id, doc_id).
+  output  first line   "Outline of '<exact file name>' (<N> sections):"          (always the word "sections")
+          then one line per section, in reading order, 1-based position:
+              "<i>. [L<level>] <heading> (p.<a>-<b>): <summary>"
+          the page part is " (p.<a>-<b>)" when page_start != page_end, " (p.<a>)" when they are equal, and left out when the
+          document has no pages (page_start is None); then ": <summary>"
+  error   no such document in THIS user's knowledge base  ->  ERROR[UNKNOWN_DOCUMENT]  (list the valid names in the message)
 
 ---------------------------------------------------------------------------------- task 5.3  observability, every call, ok AND error
-  metric  kb_stats: counter "kbstats.calls"    story_diagram: counter "story.diagrams"
-          record with attributes {"status": "ok" | "error"}  (Prometheus: agent_story_diagrams_total, ...)
+  metric  kb_stats: counter "kbstats.calls"    document_outline: counter "outline.calls"
+          record with attributes {"status": "ok" | "error"}  (Prometheus: agent_outline_calls_total, ...)
           metrics.get_meter("agent").create_counter(...)   (see how app/telemetry.py creates TOOL_CALLS)
   log     log.info("kb_stats_done", tool="kb_stats", status=..., duration_ms=<int>)
-          log.info("story_diagram_done", tool="story_diagram", status=..., duration_ms=<int>, nodes=<int, 0 on error>)
-          (`from app.telemetry import log`; never log the story text)
-  Grafana (reviewed, not auto-graded): src/app/dashboards/story.json with a panel for story.diagrams by status and a logs panel
-          ({service_name="extraction-agent"} | json | event="story_diagram_done").
+          log.info("document_outline_done", tool="document_outline", status=..., duration_ms=<int>, sections=<int, 0 on error>)
+          (`from app.telemetry import log`; never log document text)
+  Grafana (reviewed, not auto-graded): src/app/dashboards/outline.json with a panel for outline.calls by status and a logs panel
+          ({service_name="extraction-agent"} | json | event="document_outline_done").
 
 ---------------------------------------------------------------------------------- task 6.1  delete_document(doc_name: str) -> str
   Removes one document from the user's knowledge base. doc_name is a file name from the KNOWLEDGE BASE list.
@@ -49,5 +55,5 @@ from app.kb.store import KnowledgeBase
 
 
 def build_custom_tools(kb: KnowledgeBase) -> list:
-    # TODO(tasks 5 and 6): define kb_stats, story_diagram, delete_document and update_document here and return all four
+    # TODO(tasks 5 and 6): define kb_stats, document_outline, delete_document and update_document here and return all four
     return []

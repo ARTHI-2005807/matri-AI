@@ -26,7 +26,7 @@ CMD ["uvicorn", "app.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port
 FROM base AS runner
 ENV LLM_MODE=fake EMBEDDER=fake ASSESSMENT_DEBUG=1 \
     QDRANT_URL=path:/data/qdrant KB_DB=/data/kb.sqlite UPLOAD_DIR=/data \
-    CHECKPOINT_DB=/data/checkpoints.sqlite NOTES_FILE=/data/notes.json
+    CHECKPOINT_DB=/data/checkpoints.sqlite MCP_DB=/data/mcp.sqlite MCP_URL=http://localhost:9000/mcp
 
 
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS test

@@ -72,7 +72,8 @@ async def observe(request: Request, call_next):
 
 # TODO(task 4): users and authentication. See users.py for the contract. In short: POST /users, POST /login, GET /me, POST /logout,
 #   DELETE /users/me, a FastAPI dependency that turns `Authorization: Bearer <token>` into the current user (401 otherwise) and is used by /agent, /upload and /kb;
-#   /agent passes context=Ctx(session_id=..., user_id=...); a thread belongs to its first user (403 for anybody else).
+#   /agent passes context=Ctx(session_id=..., user_id=..., token=<the bearer token>) (task 7.3 forwards the token to the MCP server);
+#   a thread belongs to its first user (403 for anybody else).
 
 
 @app.get("/health")

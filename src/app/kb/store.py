@@ -94,7 +94,7 @@ class KnowledgeBase:
                 payload={
                     "session_id": session_id, "doc_id": result.doc_id, "doc_name": result.filename, "doc_title": p.title,
                     "doc_type": p.doc_type, "section": c.section.heading, "section_index": c.section.index,
-                    "section_keywords": c.section.keywords, "part": c.part, "page_start": c.section.page_start,
+                    "section_keywords": c.section.keywords, "section_level": c.section.level, "section_summary": c.section.summary, "part": c.part, "page_start": c.section.page_start,
                     "page_end": c.section.page_end, "text": c.text,
                 },
             )
@@ -191,6 +191,25 @@ class KnowledgeBase:
         prof = self.get_profile(kb_id) or {"overview": "", "keywords": []}
         self.save_profile(kb_id, prof["overview"], sorted(counts, key=counts.get, reverse=True)[:15])
         return True
+
+    def outline(self, kb_id: str, doc_id: str) -> list[dict]:
+        """PROVIDED: the sections of one document in reading order:
+        [{"index", "heading", "level", "page_start", "page_end", "keywords", "summary"}]. Blocking I/O: use asyncio.to_thread."""
+        flt = models.Filter(must=[models.FieldCondition(key="session_id", match=models.MatchValue(value=kb_id)),
+                                  models.FieldCondition(key="doc_id", match=models.MatchValue(value=doc_id))])
+        found: dict[int, dict] = {}
+        offset = None
+        while True:
+            points, offset = self.qdrant.scroll(COLLECTION, scroll_filter=flt, limit=256, offset=offset, with_payload=True)
+            for pt in points:
+                pl = pt.payload
+                found.setdefault(pl["section_index"], {
+                    "index": pl["section_index"], "heading": pl["section"], "level": pl.get("section_level", 1),
+                    "page_start": pl["page_start"], "page_end": pl["page_end"], "keywords": pl["section_keywords"],
+                    "summary": pl.get("section_summary", "")})
+            if offset is None:
+                break
+        return [found[i] for i in sorted(found)]
 
     def stats(self, kb_id: str) -> dict:
         """PROVIDED: {"documents": n, "sections": n, "chunks": n, "keywords": [most common first, lowercased]} for one knowledge base."""

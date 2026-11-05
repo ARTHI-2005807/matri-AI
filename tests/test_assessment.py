@@ -6,11 +6,14 @@ Run them yourself against `docker compose up`:   BASE_URL=http://localhost:8000 
 
 Until you implement task 4, POST /users does not exist: the other tests then run as an anonymous user, so each task is graded on its own.
 """
+import ast
 import json
+import os
 import re
 import uuid
 from pathlib import Path
 
+import httpx
 import pytest
 
 RESULTS = Path("results")
@@ -18,7 +21,9 @@ STATE = RESULTS / "state.json"
 
 REQUIRED_TOOLS = {"get_weather", "web_fetch", "sql_query", "make_chart", "openml_search", "openml_download", "pandas_query",
                   "ingest_document", "search_knowledge_base", "add_note", "list_notes",
-                  "kb_stats", "story_diagram", "delete_document", "update_document"}
+                  "add_task", "list_tasks", "set_task_status", "delete_task", "task_summary", "delete_note",
+                  "kb_stats", "document_outline", "delete_document", "update_document"}
+MCP_URL = os.getenv("MCP_URL", "http://localhost:9000/mcp")
 ASYNC_TOOLS = ["get_weather", "web_fetch", "sql_query", "search_knowledge_base"]
 PASSWORD = "correct-horse-battery"
 
@@ -320,92 +325,61 @@ def test_kb_stats(client):
     assert {l.get("status") for l in lines} >= {"ok", "error"}, "log status='ok' and status='error' (rejected input)"
 
 
-STR = r'"((?:[^"\\]|\\.)*)"'
-
-
-def unescape(text: str) -> str:
-    return re.sub(r"\\(.)", lambda m: "\n" if m[1] == "n" else m[1], text)
-
-
-def parse_dot(result: str) -> dict:
-    """Strict reader for the documented output. Returns {title, nodes: {id: label}, edges: [(src, dst, label)]}."""
-    m = re.fullmatch(r"\s*```dot\n(.*)\n```\s*", result, re.S)
-    assert m, f"the output must be exactly one fenced ```dot block, got: {result[:200]!r}"
-    lines = [l.strip() for l in m[1].split("\n") if l.strip()]
-    head = re.fullmatch(r"digraph " + STR + r" \{", lines[0])
-    assert head and lines[-1] == "}", f"expected 'digraph \"<title>\" {{' ... '}}', got: {lines[0]!r} ... {lines[-1]!r}"
-    assert "rankdir=LR;" in lines and "node [shape=box, style=rounded];" in lines, "missing rankdir=LR; or node [shape=box, style=rounded];"
-    nodes, edges = {}, []
-    for line in lines[1:-1]:
-        if line in ("rankdir=LR;", "node [shape=box, style=rounded];"):
-            continue
-        if n := re.fullmatch(r"(n\d+) \[label=" + STR + r"\];", line):
-            assert n[1] not in nodes, f"node {n[1]} declared twice"
-            nodes[n[1]] = unescape(n[2])
-        elif e := re.fullmatch(r"(n\d+) -> (n\d+)(?: \[label=" + STR + r"\])?;", line):
-            edges.append((e[1], e[2], unescape(e[3] or "")))
-        else:
-            raise AssertionError(f"line is neither a node, an edge nor a header line: {line!r}")
-    return {"title": unescape(head[1]), "nodes": nodes, "edges": edges}
+OUTLINE_MD = ("# Introduction\n\nWelcome.\n\n## Scope\n\nWhat is covered.\n\n# Rules\n\nThe rules.\n\n## Refunds\n\nMoney back.\n")
+SUMMARY = "Scripted summary of this part."
 
 
 @pytest.mark.phase1
-def test_story_output(client):
-    user = new_user(client)
-    beats = ["Hero leaves home", "Meets a mentor", "Wins the day"]
-    dot = parse_dot(call(client, user, "story_diagram", {"title": 'The "Quest"', "nodes": beats}))
-    assert dot["title"] == 'The "Quest"', f"title not escaped/kept: {dot['title']!r}"
-    assert dot["nodes"] == {"n1": beats[0], "n2": beats[1], "n3": beats[2]}, f"nodes must be n1..nK in order with their text: {dot['nodes']}"
-    assert dot["edges"] == [("n1", "n2", ""), ("n2", "n3", "")], f"without edges the beats are chained in order: {dot['edges']}"
-    nodes = ["Wake up", 'Take the "red" pill', "Take the blue pill", "Back to bed"]
-    edges = [{"source": "Wake up", "target": 'Take the "red" pill', "label": "choice 1"},
-             {"source": "Wake up", "target": "Take the blue pill", "label": ""},
-             {"source": 'Take the "red" pill', "target": "Back to bed", "label": "a\\b"}]
-    dot = parse_dot(call(client, user, "story_diagram", {"title": "Fork", "nodes": nodes, "edges": edges}))
-    assert list(dot["nodes"].values()) == nodes, f"node labels wrong (quotes must be escaped): {dot['nodes']}"
-    assert sorted(dot["edges"]) == sorted([("n1", "n2", "choice 1"), ("n1", "n3", ""), ("n2", "n4", "a\\b")]), f"edges wrong: {dot['edges']}"
+def test_outline_output(client):
+    user, thread, name = new_user(client), f"outl-{rand()}", f"policy-{rand()}.md"
+    ingest(client, user, thread, name, OUTLINE_MD)
+    out = call(client, user, "document_outline", {"doc_name": name}, thread)
+    expected = "\n".join([f"Outline of '{name}' (4 sections):", f"1. [L1] Introduction: {SUMMARY}", f"2. [L2] Scope: {SUMMARY}",
+                          f"3. [L1] Rules: {SUMMARY}", f"4. [L2] Refunds: {SUMMARY}"])
+    assert out.strip() == expected, f"unexpected outline.\n--- got ---\n{out}\n--- expected ---\n{expected}"
+    assert call(client, user, "document_outline", {"doc_name": name.upper()}, thread).startswith(f"Outline of '{name}'"), \
+        "doc_name must be resolved like the search tool does (kb.resolve_doc_name), the output uses the exact stored name"
 
 
 @pytest.mark.phase1
-def test_story_errors(client):
-    user = new_user(client)
-    cases = {
-        "TOO_FEW_NODES": {"title": "t", "nodes": ["only"]},
-        "TOO_MANY_NODES": {"title": "t", "nodes": [f"beat {i}" for i in range(13)]},
-        "EMPTY_LABEL": {"title": "t", "nodes": ["a", "   "]},
-        "DUPLICATE_NODE": {"title": "t", "nodes": ["a", "a"]},
-        "UNKNOWN_NODE": {"title": "t", "nodes": ["a", "b"], "edges": [{"source": "a", "target": "zzz", "label": ""}]},
-    }
-    results = {code: call(client, user, "story_diagram", args) for code, args in cases.items()}
-    wrong = {code: text[:120] for code, text in results.items() if not re.match(ERROR_RE.format(code=code), text, re.S)}
-    assert not wrong, f"expected 'ERROR[CODE]: ... Next step: ...' for: {wrong}"
+def test_outline_errors(client):
+    owner, thread, name = new_user(client), f"outerr-{rand()}", f"mine-{rand()}.md"
+    ingest(client, owner, thread, name, OUTLINE_MD)
+    unknown = call(client, owner, "document_outline", {"doc_name": f"nothing-{rand()}.pdf"})
+    assert re.match(ERROR_RE.format(code="UNKNOWN_DOCUMENT"), unknown, re.S), f"expected ERROR[UNKNOWN_DOCUMENT]: ... Next step: ..., got {unknown[:200]!r}"
+    thief = new_user(client)
+    if not thief["anonymous"]:
+        stolen = call(client, thief, "document_outline", {"doc_name": name})
+        assert re.match(ERROR_RE.format(code="UNKNOWN_DOCUMENT"), stolen, re.S), "another user must not be able to outline this document"
 
 
 @pytest.mark.phase1
-def test_story_metric(client):
-    user = new_user(client)
-    ok0, err0 = metric_total(client, "story.diagrams", status="ok"), metric_total(client, "story.diagrams", status="error")
-    call(client, user, "story_diagram", {"title": "m", "nodes": ["x", "y"]})
-    call(client, user, "story_diagram", {"title": "m", "nodes": ["x"]})
-    assert metric_total(client, "story.diagrams", status="ok") > ok0, "story.diagrams must grow with attributes {'status': 'ok'} on a good call"
-    assert metric_total(client, "story.diagrams", status="error") > err0, "story.diagrams must grow with {'status': 'error'} on a rejected call"
+def test_outline_metric(client):
+    user, thread, name = new_user(client), f"outm-{rand()}", f"metric-{rand()}.md"
+    ingest(client, user, thread, name, OUTLINE_MD)
+    ok0, err0 = metric_total(client, "outline.calls", status="ok"), metric_total(client, "outline.calls", status="error")
+    call(client, user, "document_outline", {"doc_name": name}, thread)
+    call(client, user, "document_outline", {"doc_name": f"nothing-{rand()}.md"}, thread)
+    assert metric_total(client, "outline.calls", status="ok") > ok0, "outline.calls must grow with attributes {'status': 'ok'} on a good call"
+    assert metric_total(client, "outline.calls", status="error") > err0, "outline.calls must grow with {'status': 'error'} on a rejected call"
 
 
 @pytest.mark.phase1
-def test_story_log(client):
-    user = new_user(client)
-    call(client, user, "story_diagram", {"title": "l", "nodes": ["x", "y", "z"]})
-    call(client, user, "story_diagram", {"title": "l", "nodes": ["x"]})
-    lines = log_lines(client, "story_diagram_done")
-    assert lines, "no log line with event 'story_diagram_done'"
-    assert all(l.get("tool") == "story_diagram" and isinstance(l.get("duration_ms"), (int, float)) for l in lines), \
-        "every line needs tool='story_diagram' and a numeric duration_ms"
+def test_outline_log(client):
+    user, thread, name = new_user(client), f"outl-{rand()}", f"log-{rand()}.md"
+    ingest(client, user, thread, name, OUTLINE_MD)
+    call(client, user, "document_outline", {"doc_name": name}, thread)
+    call(client, user, "document_outline", {"doc_name": f"nothing-{rand()}.md"}, thread)
+    lines = log_lines(client, "document_outline_done")
+    assert lines, "no log line with event 'document_outline_done'"
+    assert all(l.get("tool") == "document_outline" and isinstance(l.get("duration_ms"), (int, float)) for l in lines), \
+        "every line needs tool='document_outline' and a numeric duration_ms"
     oks, errs = [l for l in lines if l.get("status") == "ok"], [l for l in lines if l.get("status") == "error"]
     assert oks and errs, "log status='ok' for good calls and status='error' for rejected ones"
-    assert oks[-1].get("nodes") == 3 and all(l.get("nodes") == 0 for l in errs), "log nodes=<count> on ok and nodes=0 on error"
+    assert oks[-1].get("sections") == 4 and all(l.get("sections") == 0 for l in errs), "log sections=<count> on ok and sections=0 on error"
     before = len(lines)
-    call(client, user, "story_diagram", {"title": "l", "nodes": ["x", "y"]})
-    assert len(log_lines(client, "story_diagram_done")) > before, "one log line per call, every call"
+    call(client, user, "document_outline", {"doc_name": name}, thread)
+    assert len(log_lines(client, "document_outline_done")) > before, "one log line per call, every call"
 
 
 # ================================================================== task 6: delete_document, update_document
@@ -479,6 +453,153 @@ def test_update_errors(client):
     assert kb_docs(client, user, thread) == [name]
 
 
+# ================================================================== task 7: notes and tasks MCP server
+def mcp_call(tool: str, args: dict, authorization: str | None = None) -> tuple[bool, str]:
+    """Speaks MCP (streamable HTTP + JSON-RPC) straight to the server, like any MCP client. -> (is_error, text)."""
+    headers = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
+    if authorization is not None:
+        headers["Authorization"] = authorization
+
+    def rpc(c, body, extra=None):
+        r = c.post(MCP_URL, headers={**headers, **(extra or {})}, json=body)
+        assert r.status_code in (200, 202), f"MCP server returned {r.status_code}: {r.text[:200]}"
+        if r.status_code == 202 or not r.text.strip():
+            return r, None
+        text = r.text
+        if "data:" in text and r.headers.get("content-type", "").startswith("text/event-stream"):
+            text = "".join(l[5:].strip() for l in text.splitlines() if l.startswith("data:"))
+        return r, json.loads(text)
+
+    with httpx.Client(timeout=30) as c:
+        r, _ = rpc(c, {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+            "protocolVersion": "2025-03-26", "capabilities": {}, "clientInfo": {"name": "grader", "version": "1"}}})
+        sid = {"mcp-session-id": r.headers["mcp-session-id"]} if "mcp-session-id" in r.headers else {}
+        rpc(c, {"jsonrpc": "2.0", "method": "notifications/initialized"}, sid)
+        _, out = rpc(c, {"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": tool, "arguments": args}}, sid)
+    result = out["result"]
+    return bool(result.get("isError")), "".join(b.get("text", "") for b in result.get("content", []))
+
+
+def bearer(user: dict) -> str:
+    return user["headers"]["Authorization"]
+
+
+def mcp_value(result: str):
+    """The JSON a tool returned. Through the agent the text may arrive as a JSON string or as a stringified content list."""
+    try:
+        return json.loads(result)
+    except ValueError:
+        blocks = ast.literal_eval(result)
+        return json.loads("".join(b["text"] for b in blocks))
+
+
+def mcp(client, user: dict, tool: str, args: dict | None = None, thread: str | None = None):
+    return mcp_value(call(client, user, tool, args or {}, thread))
+
+
+def is_error(text: str, code: str) -> bool:
+    return bool(re.search(ERROR_RE.format(code=code), text, re.S))
+
+
+@pytest.mark.phase1
+def test_mcp_tools(client):
+    user = new_user(client)
+    need_users(user)
+    thread = f"mcp-{rand()}"
+    task = mcp(client, user, "add_task", {"title": "write report", "details": "q3"}, thread)
+    assert task == {"id": task["id"], "title": "write report", "status": "todo"}, f"add_task returns {{id, title, status}}: {task}"
+    assert [t["title"] for t in mcp(client, user, "list_tasks", {}, thread)] == ["write report"], "list_tasks: this user's tasks only"
+    assert mcp(client, user, "set_task_status", {"task_id": task["id"], "status": "in_progress"}, thread) == {"id": task["id"], "status": "in_progress"}
+    assert mcp(client, user, "task_summary", {}, thread) == {"todo": 0, "in_progress": 1, "done": 0}
+    note = mcp(client, user, "add_note", {"title": "idea", "body": "try graphs"}, thread)
+    assert note["title"] == "idea" and mcp(client, user, "list_notes", {}, thread)[0]["body"] == "try graphs"
+    assert mcp(client, user, "delete_note", {"note_id": note["id"]}, thread) == {"deleted": note["id"]}
+    assert mcp(client, user, "delete_task", {"task_id": task["id"]}, thread) == {"deleted": task["id"]}
+
+
+@pytest.mark.phase1
+def test_mcp_auth(client):
+    user = new_user(client)
+    need_users(user)
+    calls = {"add_note": {"title": "t", "body": "b"}, "list_notes": {}, "delete_note": {"note_id": 1}, "add_task": {"title": "t"},
+             "list_tasks": {}, "set_task_status": {"task_id": 1, "status": "done"}, "delete_task": {"task_id": 1}, "task_summary": {}}
+    bad = {}
+    for tool, args in calls.items():
+        for label, header in (("no token", None), ("not Bearer", "Basic abc"), ("unknown token", "Bearer nope-" + rand())):
+            err, text = mcp_call(tool, args, header)
+            if not (err and is_error(text, "UNAUTHENTICATED")):
+                bad[f"{tool} ({label})"] = text[:80]
+    assert not bad, f"every tool must answer ERROR[UNAUTHENTICATED]: ... Next step: ... without a valid token: {bad}"
+    err, text = mcp_call("list_tasks", {}, bearer(user))
+    assert not err and json.loads(text) == [], f"a valid token must work: {text[:200]}"
+
+
+@pytest.mark.phase1
+def test_mcp_isolation(client):
+    alice, bob = new_user(client), new_user(client)
+    need_users(alice)
+    title, note_title = f"alice-task-{rand()}", f"alice-note-{rand()}"
+    task = mcp(client, alice, "add_task", {"title": title})
+    note = mcp(client, alice, "add_note", {"title": note_title, "body": "private"})
+    assert mcp(client, bob, "list_tasks") == [] and mcp(client, bob, "list_notes") == [], "Bob sees Alice's tasks or notes"
+    assert mcp(client, bob, "task_summary") == {"todo": 0, "in_progress": 0, "done": 0}
+    assert is_error(call(client, bob, "set_task_status", {"task_id": task["id"], "status": "in_progress"}), "TASK_NOT_FOUND"), "Bob must not touch Alice's task"
+    assert is_error(call(client, bob, "delete_task", {"task_id": task["id"]}), "TASK_NOT_FOUND")
+    assert is_error(call(client, bob, "delete_note", {"note_id": note["id"]}), "NOTE_NOT_FOUND")
+    err, text = mcp_call("list_tasks", {}, bearer(bob))
+    assert title not in text, "Bob's own token must not show Alice's tasks over MCP either"
+    assert [t["title"] for t in mcp(client, alice, "list_tasks")] == [title], "Alice's data must be untouched"
+    save_state(mcp_alice=alice, mcp_bob=bob, mcp_title=title)
+
+
+@pytest.mark.phase1
+def test_mcp_task_lifecycle(client):
+    user = new_user(client)
+    need_users(user)
+    ids = [mcp(client, user, "add_task", {"title": f"task {i}"})["id"] for i in range(3)]
+    assert len(mcp(client, user, "list_tasks", {"status": "todo"})) == 3
+    mcp(client, user, "set_task_status", {"task_id": ids[0], "status": "in_progress"})
+    assert [t["id"] for t in mcp(client, user, "list_tasks", {"status": "in_progress"})] == [ids[0]], "list_tasks must filter by status"
+    mcp(client, user, "set_task_status", {"task_id": ids[0], "status": "done"})
+    assert mcp(client, user, "task_summary") == {"todo": 2, "in_progress": 0, "done": 1}
+    errors = {
+        "INVALID_TRANSITION": call(client, user, "set_task_status", {"task_id": ids[1], "status": "done"}),   # todo -> done is not allowed
+        "INVALID_STATUS": call(client, user, "set_task_status", {"task_id": ids[1], "status": "blocked"}),
+        "TASK_NOT_FOUND": call(client, user, "set_task_status", {"task_id": 999999, "status": "in_progress"}),
+        "INVALID_INPUT": call(client, user, "add_task", {"title": "   "}),
+    }
+    wrong = {code: text[:120] for code, text in errors.items() if not is_error(text, code)}
+    assert not wrong, f"expected 'ERROR[CODE]: ... Next step: ...' for: {wrong}"
+    assert is_error(call(client, user, "list_tasks", {"status": "later"}), "INVALID_STATUS")
+    mcp(client, user, "delete_task", {"task_id": ids[2]})
+    assert len(mcp(client, user, "list_tasks")) == 2
+
+
+@pytest.mark.phase1
+def test_mcp_notes(client):
+    user = new_user(client)
+    need_users(user)
+    a = mcp(client, user, "add_note", {"title": "first", "body": "one"})
+    mcp(client, user, "add_note", {"title": "second", "body": "two"})
+    assert [(n["title"], n["body"]) for n in mcp(client, user, "list_notes")] == [("first", "one"), ("second", "two")]
+    mcp(client, user, "delete_note", {"note_id": a["id"]})
+    assert [n["title"] for n in mcp(client, user, "list_notes")] == ["second"]
+    assert is_error(call(client, user, "delete_note", {"note_id": a["id"]}), "NOTE_NOT_FOUND")
+    assert is_error(call(client, user, "add_note", {"title": " ", "body": "x"}), "INVALID_INPUT")
+
+
+@pytest.mark.phase1
+def test_mcp_token_hygiene(client):
+    user = new_user(client)
+    need_users(user)
+    token, thread = user["token"], f"hyg-{rand()}"
+    outs = [ask(client, user, thread, f"call {t} {json.dumps(a)}") for t, a in
+            (("add_task", {"title": "x"}), ("list_tasks", {}), ("add_note", {"title": "n", "body": "b"}))]
+    outs += [ask(client, user, thread, "showprompt"), ask(client, user, thread, "recall")]
+    assert token not in json.dumps(outs), "the bearer token leaked into a step, answer or prompt: forward it in a header only"
+    assert token not in json.dumps(client.get("/debug/telemetry").json()), "the bearer token leaked into a log line or metric attribute"
+
+
 # ================================================================== phase 2 (after `docker restart`)
 @pytest.mark.phase2
 def test_memory_persists_after_restart(client):
@@ -499,3 +620,11 @@ def test_user_state_persists_after_restart(client):
     assert state["kb_token"] in search(client, kb_user, f"after-{rand()}", state["kb_token"]), "search finds nothing after the restart"
     ask(client, bob, state["iso_thread"], "recall", expect=403)  # thread ownership must persist too
     assert state["iso_token"] not in search(client, bob, f"bob-after-{rand()}", state["iso_token"]), "isolation broke after the restart"
+
+
+@pytest.mark.phase2
+def test_mcp_persists_after_restart(client):
+    state = load_state()
+    alice, bob = state["mcp_alice"], state["mcp_bob"]
+    assert [t["title"] for t in mcp(client, alice, "list_tasks")] == [state["mcp_title"]], "Alice's tasks are gone after the restart (MCP_DB must live on the volume)"
+    assert mcp(client, bob, "list_tasks") == [], "isolation broke after the restart"

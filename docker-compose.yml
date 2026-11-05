@@ -6,7 +6,7 @@ services:
     env_file: .env
     environment:
       QDRANT_URL: http://qdrant:6333
-      MCP_URL: http://notes-mcp:9000/mcp
+      MCP_URL: http://notes-mcp:9000/mcp   # your notes and tasks MCP server (src/app/mcp_server/server.py)
       GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}   # override from the shell: GROQ_MODEL=openai/gpt-oss-20b docker compose up -d
       ASSESSMENT_DEBUG: "1"          # exposes /debug/telemetry and /debug/assessment
       CHECKPOINT_DB: /data/checkpoints.sqlite   # chat memory (task 2: make it a SQLite checkpointer)
@@ -18,48 +18,19 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }   # the users database must be migrated first
       qdrant: { condition: service_started }
-      notes-mcp: { condition: service_started }
-      otel-collector: { condition: service_started }
-    volumes:
-      - app_data:/data
-    restart: unless-stopped
-
-  migrate:   # one-shot task: applies your Alembic migrations (src/app/migrations) to /data/users.sqlite, then exits
+      notes-mcp:   # task 7: notes and tasks per user. Same image, same /data volume (it reads users.sqlite to check tokens)
     build: { context: ., target: app }
-    command: ["alembic", "upgrade", "head"]
+    command: ["python", "src/app/mcp_server/server.py", "--http"]
     environment:
       KB_DB: /data/kb.sqlite
-    volumes:
-      - app_data:/data
-
-  ui:   # Gradio: a plain API client (no agent code)
-    build: { context: ., target: app }
-    command: ["python", "ui/app.py"]
-    ports:
-      - "7860:7860"
-    environment:
-      API_URL: http://api:8000
-      PUBLIC_API_URL: http://localhost:8000   # charts open in the browser, so this must be reachable from it
-    depends_on:
-      - api
-    restart: unless-stopped
-
-  qdrant:
-    image: qdrant/qdrant:latest
-    ports:
-      - "${QDRANT_PORT:-6333}:6333"
-    volumes:
-      - qdrant_data:/qdrant/storage
-
-  notes-mcp:
-    build: { context: ., target: app }
-    command: ["python", "mcp_server/notes_server.py", "--http"]
-    environment:
-      NOTES_FILE: /data/notes.json
+      MCP_DB: /data/mcp.sqlite
     ports:
       - "9000:9000"
+    depends_on:
+      migrate: { condition: service_completed_successfully }
     volumes:
-      - notes_data:/data
+      - app_data:/data
+    restart: unless-stopped
 
   # ---- observability: app -> collector -> Tempo / Prometheus / Loki -> Grafana ----
   otel-collector:
@@ -121,7 +92,6 @@ networks:
 volumes:
   app_data:
   qdrant_data:
-  notes_data:
   tempo_data:
   loki_data:
   prometheus_data:

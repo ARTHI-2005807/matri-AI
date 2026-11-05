@@ -49,9 +49,11 @@ jobs:
           docker volume create eval-data
           docker run --rm -v eval-data:/data eval-app:ci python scripts/check_migration.py | tee results/migration.json || echo '{}' > results/migration.json
 
-      - name: Start app container
+      - name: Start the MCP server (notes and tasks, task 7) and the app
         run: |
-          docker run -d --name eval-app --memory 1g --cpus 1 -p 8000:8000 -v eval-data:/data eval-app:ci
+          docker run -d --name eval-mcp --network host -v eval-data:/data eval-app:ci python src/app/mcp_server/server.py --http
+          for i in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/9000) 2>/dev/null && break; sleep 1; done
+          docker run -d --name eval-app --network host --memory 1g --cpus 1 -v eval-data:/data eval-app:ci
 
       - name: Wait for /health
         run: |
@@ -69,6 +71,7 @@ jobs:
         run: |
           docker run --rm --network host \
             -e BASE_URL=http://localhost:8000 \
+            -e MCP_URL=http://localhost:9000/mcp \
             -e ASSESSMENT_ID=agentic-ai-extension \
             -e GITHUB_SHA=${{ github.sha }} \
             -v ${{ github.workspace }}/results:/app/results \
@@ -78,6 +81,8 @@ jobs:
       - name: Restart the app container (same data volume)
         if: always()
         run: |
+          docker restart eval-mcp
+          for i in $(seq 1 30); do (echo > /dev/tcp/127.0.0.1/9000) 2>/dev/null && break; sleep 1; done
           docker restart eval-app
           for i in $(seq 1 60); do
             curl -sf http://localhost:8000/health >/dev/null && echo "App back after restart" && exit 0
@@ -94,6 +99,7 @@ jobs:
         run: |
           docker run --rm --network host \
             -e BASE_URL=http://localhost:8000 \
+            -e MCP_URL=http://localhost:9000/mcp \
             -e ASSESSMENT_ID=agentic-ai-extension \
             -e GITHUB_SHA=${{ github.sha }} \
             -v ${{ github.workspace }}/results:/app/results \
@@ -107,7 +113,7 @@ jobs:
 
       - name: App log (last lines)
         if: always()
-        run: docker logs --tail 60 eval-app || true
+        run: docker logs --tail 60 eval-app || true; docker logs --tail 30 eval-mcp || true
 
       - name: Upload test results
         if: always()
@@ -125,4 +131,4 @@ jobs:
 
       - name: Stop app container
         if: always()
-        run: docker rm -f eval-app || true
+        run: docker rm -f eval-app eval-mcp || true

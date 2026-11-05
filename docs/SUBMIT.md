@@ -1,9 +1,9 @@
 # Agentic AI assessment: extend the Document Agent - how to submit
 
 ## At a glance
-- Build: integrate the Document Agent: agent definition, async tools, SQLite chat memory, Alembic migration, user management with per-user knowledge bases, two new tools with observability, knowledge-base management tools (see `docs/TASK.md`)
+- Build: integrate the Document Agent: agent definition, async tools, SQLite chat memory, Alembic migration, user management with per-user knowledge bases, two new tools with observability, knowledge-base management tools, a notes and tasks MCP server with per-user auth (see `docs/TASK.md`)
 - Window: **the opening time your instructor announced** to **the closing time your instructor announced** (judged on when your GitHub Actions run finishes)
-- Pass: **all 26 points** (every task is required; partial scores are recorded too)
+- Pass: **all 34 points** (every task is required; partial scores are recorded too)
 - You may submit as many times as you like; **your best score is kept**
 - Result arrives by **email** (check spam)
 
@@ -86,7 +86,7 @@ GitHub, then **Settings, Developer settings, Personal access tokens, Fine-graine
 - Solutions are compared across students; matching code is flagged for review
 
 ## Scoring
-The full table of the 26 checks (ids, points, what each one proves) is in `docs/TASK.md`. The email lists every check as PASS or FAIL.
+The full table of the 34 checks (ids, points, what each one proves) is in `docs/TASK.md`. The email lists every check as PASS or FAIL.
 
 ## If something goes wrong
 The email says what failed. Common ones:

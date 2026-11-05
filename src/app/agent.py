@@ -1,7 +1,6 @@
+import asyncio
 import os
 import re
-import sys
-from pathlib import Path
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware, ModelRequest, dynamic_prompt
@@ -18,7 +17,7 @@ from app.tools_s1 import S1_TOOLS
 
 SYSTEM_PROMPT = """You are a friendly, concise assistant for backend developers. Answer directly; don't narrate your process or name tools unless asked.
 
-Tools: weather, web_fetch, SQL over "chinook" (music store) and "northwind" (trading company), Altair charts, OpenML + pandas, notes, and the user's own documents.
+Tools: weather, web_fetch, SQL over "chinook" (music store) and "northwind" (trading company), Altair charts, OpenML + pandas, tasks and notes (kept per user), and the user's own documents.
 
 KNOWLEDGE BASE
 - The KNOWLEDGE BASE block below lists the user's own documents (overview, keywords, one line per file).
@@ -35,7 +34,6 @@ DATA AND CHARTS
 - sql_query/pandas_query return a data_ref: pass it to make_chart, never retype rows. Let make_chart aggregate (Altair shorthand such as "mean(Sales):Q").
 - Charts appear in the UI automatically: don't mention file paths or links."""
 
-MCP_SERVER = Path(__file__).resolve().parents[2] / "mcp_server" / "notes_server.py"
 CHART_RE = re.compile(r"(chart_[0-9a-f]+\.html)")
 
 
@@ -64,14 +62,23 @@ class ShrinkOldToolResults(AgentMiddleware):
 
 
 async def mcp_tools():
-    """MCP tools become ordinary LangChain tools. stdio locally, HTTP in docker-compose."""
-    url = os.getenv("MCP_URL")
-    server = (
-        {"url": url, "transport": "streamable_http"}
-        if url
-        else {"command": sys.executable, "args": [str(MCP_SERVER)], "transport": "stdio"}
-    )
-    return await MultiServerMCPClient({"notes": server}).get_tools()
+    """MCP tools become ordinary LangChain tools. The notes and tasks server (src/app/mcp_server/server.py) is reached over HTTP at
+    MCP_URL (docker compose and CI start it). Retries a few times: the server may still be starting.
+
+    TODO(task 7.3): make every MCP call run AS THE LOGGED-IN USER. The server reads `Authorization: Bearer <token>`. Write a tool
+    interceptor (langchain-mcp-adapters: `async def interceptor(request, handler)`; `request.runtime.context` is this request's Ctx,
+    `request.override(headers={...})` returns a request with extra HTTP headers) and pass it as tool_interceptors=[...] below.
+    The token comes from Ctx (task 4: add `token` to Ctx, /agent fills it from the Authorization header). The model never sees it.
+    """
+    url = os.getenv("MCP_URL", "http://localhost:9000/mcp")
+    client = MultiServerMCPClient({"tasks": {"url": url, "transport": "streamable_http"}})  # TODO(task 7.3): tool_interceptors=[...]
+    for attempt in range(15):
+        try:
+            return await client.get_tools()
+        except Exception:
+            if attempt == 14:
+                raise
+            await asyncio.sleep(2)
 
 
 async def build_agent(kb: KnowledgeBase, model=agent_llm, checkpointer=None):
@@ -79,11 +86,11 @@ async def build_agent(kb: KnowledgeBase, model=agent_llm, checkpointer=None):
 
     What is here is a bare agent: Session 1 tools only, one fixed prompt, no memory. Build the real one, in this order:
 
-      1. TOOLS: one list with exactly these 15 tools (the grader compares names with /health)
+      1. TOOLS: one list with exactly these 21 tools (the grader compares names with /health)
            S1_TOOLS (7)                      get_weather web_fetch sql_query make_chart openml_search openml_download pandas_query
            build_kb_tools(kb) (2)            ingest_document search_knowledge_base
-           await mcp_tools() (2)             add_note list_notes
-           build_custom_tools(kb) (4)        kb_stats story_diagram delete_document update_document   (you write them: tasks 5 and 6)
+           await mcp_tools() (8)             add_note list_notes delete_note add_task list_tasks set_task_status delete_task task_summary
+           build_custom_tools(kb) (4)        kb_stats document_outline delete_document update_document   (you write them: tasks 5 and 6)
       2. DYNAMIC PROMPT: a @dynamic_prompt function returning f"{SYSTEM_PROMPT}\n\n{kb.prompt_block(<kb id>)}" so that the model
          sees the CURRENT knowledge base on every model call (what was uploaded, keywords, exact file names). `request.runtime.context`
          is the Ctx of this request. (Which id? Task 4: the knowledge base belongs to the USER: request.runtime.context.user_id.)

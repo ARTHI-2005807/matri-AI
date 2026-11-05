@@ -71,9 +71,19 @@ def _structured(schema, prompt: str) -> Any:
     from app.kb.models import DocProfile, KBProfile, SectionSpan, WindowSections
 
     if schema is WindowSections:
-        ids = [int(x) for x in re.findall(r"^\[(\d+)\]", prompt, re.M)] or [0]
-        return WindowSections(sections=[SectionSpan(heading="Content", level=1, start_block=ids[0], end_block=ids[-1],
-                                                    keywords=["demo", "document"], summary="Scripted summary of this part.")])
+        blocks = [(int(i), t) for i, t in re.findall(r"^\[(\d+)\] (.*)$", prompt, re.M)] or [(0, "")]
+        starts = [i for i, t in blocks if t.lstrip().startswith("#")]
+        if not starts or starts[0] != blocks[0][0]:
+            starts = [blocks[0][0], *starts]  # text before the first heading is its own section
+        text = dict(blocks)
+        ends = [*[s - 1 for s in starts[1:]], blocks[-1][0]]
+        spans = []
+        for start, end in zip(starts, ends):
+            head = text[start].lstrip()
+            level = len(head) - len(head.lstrip("#"))
+            spans.append(SectionSpan(heading=head.lstrip("# ").strip()[:60] or "Content", level=max(level, 1), start_block=start, end_block=end,
+                                     keywords=["demo", "document"], summary="Scripted summary of this part."))
+        return WindowSections(sections=spans)
     if schema is DocProfile:
         name = (re.search(r"File: (.+)", prompt) or [None, "document"])[1].strip().rsplit(".", 1)[0]
         return DocProfile(title=name, doc_type="document", language="English", summary=f"Scripted profile of {name}.", keywords=["demo", "document"])

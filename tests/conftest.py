@@ -11,7 +11,7 @@ ASSESSMENT_ID = os.getenv("ASSESSMENT_ID", "local")
 # test function name -> (stable check id, display name, points)
 CHECKS = {
     # task 1: the agent definition
-    "test_agent_tools": ("agent-tools", "1.1 The agent has exactly the 15 required tools", 1),
+    "test_agent_tools": ("agent-tools", "1.1 The agent has exactly the 21 required tools", 1),
     "test_agent_prompt": ("agent-prompt", "1.2 The dynamic prompt shows the current knowledge base to the model", 1),
     "test_baseline_intact": ("baseline", "1.3 Context wiring: upload, ingest, search, citations and SQL work end to end", 1),
     # task 2: async
@@ -32,15 +32,23 @@ CHECKS = {
     "test_user_state_persists_after_restart": ("user-persists", "4.6 Users, tokens, threads and knowledge bases survive a restart", 1),
     # task 5: new tools + observability
     "test_kb_stats": ("kb-stats", "5.1 kb_stats: numbers, error contract, metric and log", 1),
-    "test_story_output": ("story-output", "5.2 story_diagram returns valid, correctly structured DOT", 2),
-    "test_story_errors": ("story-errors", "5.2 story_diagram reports each bad input with its ERROR[CODE]", 1),
-    "test_story_metric": ("story-metric", "5.3 story.diagrams counter on every call (ok and error)", 1),
-    "test_story_log": ("story-log", "5.3 story_diagram_done structured log line on every call", 1),
+    "test_outline_output": ("outline-output", "5.2 document_outline returns the documented outline (levels, order, pages)", 2),
+    "test_outline_errors": ("outline-errors", "5.2 document_outline: ERROR[UNKNOWN_DOCUMENT], never another user's document", 1),
+    "test_outline_metric": ("outline-metric", "5.3 outline.calls counter on every call (ok and error)", 1),
+    "test_outline_log": ("outline-log", "5.3 document_outline_done structured log line on every call", 1),
     # task 6: knowledge-base management tools
     "test_delete_works": ("delete-works", "6.1 delete_document removes the document, only for its owner", 1),
     "test_delete_errors": ("delete-errors", "6.1 delete_document: ERROR[UNKNOWN_DOCUMENT], never another user's document", 1),
     "test_update_works": ("update-works", "6.2 update_document replaces the content under the same name", 1),
     "test_update_errors": ("update-errors", "6.2 update_document: error codes, old version untouched on failure", 1),
+    # task 7: notes and tasks MCP server, per-user auth
+    "test_mcp_tools": ("mcp-tools", "7.1 The eight MCP tools work through the agent, as the logged-in user (token forwarded)", 1),
+    "test_mcp_auth": ("mcp-auth", "7.2 The MCP server rejects missing, malformed and unknown tokens", 2),
+    "test_mcp_isolation": ("mcp-isolation", "7.2 Notes and tasks are private per user", 1),
+    "test_mcp_task_lifecycle": ("mcp-lifecycle", "7.3 Task lifecycle: statuses, filtering, summary, error codes", 1),
+    "test_mcp_notes": ("mcp-notes", "7.3 Notes: add, list, delete, error codes", 1),
+    "test_mcp_token_hygiene": ("mcp-token-hygiene", "7.4 The token is never in a tool argument, step, answer or log line", 1),
+    "test_mcp_persists_after_restart": ("mcp-persists", "7.5 Notes and tasks survive a restart of the MCP server and the API", 1),
 }
 
 RESULTS = Path("results")
