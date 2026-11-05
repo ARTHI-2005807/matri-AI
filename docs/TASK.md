@@ -60,6 +60,28 @@ The MCP server stores notes and tasks for each user. The storage is provided (`t
 - **7.4 forward the token from the agent (1):** add `token` to `Ctx` (`/agent` fills it from the Authorization header) and write a `langchain-mcp-adapters` tool interceptor in `agent.py` that sets `Authorization: Bearer <runtime.context.token>` on every MCP call (`tool_interceptors=[...]`). The token must not appear in any tool argument, step, answer, prompt or log line.
 - **7.5 survives a restart (1):** `MCP_DB` is on the data volume. `docker compose` runs the server as the `notes-mcp` service; CI starts it as a second container on the same volume and restarts both.
 
+## Where the work is: 9 files, about 320 lines
+Most of it is wiring and docstrings; the reference solution adds this much per file (code lines, docstrings included):
+
+| File | Tasks | About |
+|---|---|---|
+| `src/app/agent.py` | 1, 7.4 | 22 lines: tool list, dynamic prompt, `create_agent`, the MCP token interceptor |
+| `src/app/persistence.py` | 3 | 6 lines: `AsyncSqliteSaver` |
+| `src/app/tools_s1.py`, `src/app/kb/tools.py` | 2 | 30 lines: `async def`, `httpx.AsyncClient`, `asyncio.to_thread` |
+| `src/app/context.py` | 4.4, 7.4 | 3 lines: `user_id`, `token` |
+| `src/app/main.py` | 3, 4, 7.4 | 60 lines: lifespan, `current_user`, 5 account endpoints, protect 4 routes, claim threads, pass the token |
+| `src/app/migrations/0001_*.py` | 4.1 | 20 lines: three `op.create_table`, three `op.drop_table` |
+| `src/app/custom_tools.py` | 5, 6 | 100 lines: four tools (the longest file; metric and log are 6 lines each) |
+| `src/app/mcp_server/server.py` | 7.1, 7.2 | 75 lines: `current_user_id` plus eight small tool wrappers |
+
+Plan for a day of work, in this order (each step makes more checks pass; run `bash scripts/local_eval.sh` after each):
+1. Task 1 (agent.py): everything else depends on a working agent.
+2. Task 3 (persistence.py + lifespan), then task 2 (async).
+3. Task 4.1 (migration), then 4.2 to 4.6 (users, auth, per-user knowledge base).
+4. Task 7 (MCP server, then the token interceptor): needs users to exist.
+5. Tasks 5 and 6 (the four tools).
+Tip: the provided files (`users.py`, `taskstore.py`, `kb/store.py`) are the documentation: read their docstrings first.
+
 ## Score table
 | Task | Check ids |
 |---|---|
