@@ -38,11 +38,5 @@ info "restarting the container (same data volume)"; docker restart "$MCP_CONTAIN
 info "phase 2: after the restart"; run_tests phase2
 
 echo
-python3 - <<'PY'
-import json
-s = json.load(open("results/summary.json"))
-print(f"\n{s['earnedPoints']}/{s['totalPoints']} points\n")
-for c in s["checks"]:
-    print(("  PASS " if c["passed"] else "  FAIL "), c["points"], c["id"], "-", c["name"])
-PY
+python3 scripts/render_summary.py
 echo -e "\n(the app's log is in 'docker logs'; it is removed with the container. Re-run after fixing.)"

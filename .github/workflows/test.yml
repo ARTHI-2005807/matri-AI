@@ -108,8 +108,7 @@ jobs:
 
       - name: Show the score
         if: always()
-        run: |
-          python3 -c "import json;s=json.load(open('results/summary.json'));print(f\"{s['earnedPoints']}/{s['totalPoints']} points\");[print(('PASS' if c['passed'] else 'FAIL'), c['points'], c['id'], '-', c['name']) for c in s['checks']]" || true
+        run: python3 scripts/render_summary.py || true
 
       - name: App log (last lines)
         if: always()
@@ -127,7 +126,9 @@ jobs:
 
       - name: Fail the run if any test failed
         if: steps.phase1.outcome == 'failure' || steps.phase2.outcome == 'failure'
-        run: exit 1
+        run: |
+          echo "::error title=Not every check passed::Open the Summary tab of this run: it shows your score and what to fix. The score is recorded when you submit this run."
+          exit 1
 
       - name: Stop app container
         if: always()

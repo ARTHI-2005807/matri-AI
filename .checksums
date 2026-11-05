@@ -11,7 +11,7 @@ da01968c34c9ad507f89b7a2e31121b53720287d  data/northwind.sqlite
 d664979f3c06b99d53d3b8e04398d485f1c52bec  docs/TASK.md
 a379e810ba7bcf664b7d174b79aa76986c8bd80d  .env.example
 6313b56c57848efce05faa7aa7e901ccfc2886ea  .gitattributes
-dda170cd88b26813ddd841bf09867aae6ab888ad  .github/workflows/test.yml
+5d766656eb403352d96d71d3ae54e6edc922b79a  .github/workflows/test.yml
 d8c9bea8bf7faea5cfa88ef2dc9984871716c84b  observability/alerts.yml
 b220ee837f15714a7f93860841bbae6bb90ef32f  observability/grafana/dashboards/agent-overview.json
 6263bfad1f02f4df420358be157bd9eb7f442f29  observability/grafana/provisioning/dashboards/dashboards.yml
@@ -33,9 +33,10 @@ cff8ed70a9bcffe3651c7c3308ea7a582421c1bb  scripts/check_protected.sh
 5051515b9867cf8ba658413dfae9e204d4414643  scripts/check_setup.sh
 6a87b2473409a697b58708262c297a27b80c60ad  scripts/generate_checksums.sh
 65dba46f37fc69672901260d6dbf6eb1be649521  scripts/_lib.sh
-bcc20617b6991c7078286616997e9c648bcde19f  scripts/local_eval.sh
+97f0b2518acb492539b3d307d36ef063aa17bb87  scripts/local_eval.sh
 f15de34b2eb85f8f46a9f979dae2db696a40423c  scripts/make_scanned_pdf.py
-84c3c54d178db17b67264abffe8bc8d12482b461  tests/conftest.py
+4ae2680f5ee2e3a92d834193bef47534e4dad5ac  scripts/render_summary.py
+f1ae053713be304c3a247009e1b79fc6defe5107  tests/conftest.py
 0851f673bd819fcd5b6968ddd2a6abaf22cf8e4c  tests/test_assessment.py
 fe3bea54765e906d1ecfd07ca65a2180a1643850  ui/app.py
 f1f30ab48ed7bf16f4b375c2c96510df2259e508  uv.lock

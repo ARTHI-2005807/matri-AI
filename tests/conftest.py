@@ -66,11 +66,25 @@ def client():
         yield c
 
 
+_details: dict[str, str] = {}
+
+
+def _reason(report) -> str:
+    """The first useful line of a failure ('E   AssertionError: ...'), for the student-friendly summary."""
+    lines = [l[1:].strip() for l in report.longreprtext.splitlines() if l.startswith("E ")]
+    text = next((l for l in lines if l.strip()), "failed")
+    return text.replace("AssertionError: ", "")[:400]
+
+
 def pytest_runtest_logreport(report):
+    name = report.nodeid.split("::")[-1]
     if report.when == "call":
-        _outcomes[report.nodeid.split("::")[-1]] = report.passed
+        _outcomes[name] = report.passed
+        if report.failed:
+            _details[name] = _reason(report)
     elif report.when in ("setup", "teardown") and report.failed:
-        _outcomes[report.nodeid.split("::")[-1]] = False
+        _outcomes[name] = False
+        _details[name] = _reason(report)
 
 
 def pytest_sessionfinish(session, exitstatus):
@@ -79,6 +93,11 @@ def pytest_sessionfinish(session, exitstatus):
     store = RESULTS / "outcomes.json"
     merged = {**(json.loads(store.read_text()) if store.exists() else {}), **_outcomes}
     store.write_text(json.dumps(merged))
+    dstore = RESULTS / "details.json"
+    old = json.loads(dstore.read_text()) if dstore.exists() else {}
+    details = {**{func: old[cid] for func, (cid, _, _) in CHECKS.items() if cid in old}, **_details}
+    by_id = {cid: details[func] for func, (cid, _, _) in CHECKS.items() if func in details and not merged.get(func, False)}
+    dstore.write_text(json.dumps(by_id))  # check id -> why it fails (read by scripts/render_summary.py)
     checks = [
         {"id": cid, "name": name, "passed": merged.get(func, False), "points": pts}
         for func, (cid, name, pts) in CHECKS.items()
