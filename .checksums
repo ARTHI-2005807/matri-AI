@@ -33,7 +33,7 @@ cff8ed70a9bcffe3651c7c3308ea7a582421c1bb  scripts/check_protected.sh
 5051515b9867cf8ba658413dfae9e204d4414643  scripts/check_setup.sh
 6a87b2473409a697b58708262c297a27b80c60ad  scripts/generate_checksums.sh
 65dba46f37fc69672901260d6dbf6eb1be649521  scripts/_lib.sh
-97f0b2518acb492539b3d307d36ef063aa17bb87  scripts/local_eval.sh
+8c437dbebb5f05d8e36c383356475ac90e13525d  scripts/local_eval.sh
 f15de34b2eb85f8f46a9f979dae2db696a40423c  scripts/make_scanned_pdf.py
 4ae2680f5ee2e3a92d834193bef47534e4dad5ac  scripts/render_summary.py
 f1ae053713be304c3a247009e1b79fc6defe5107  tests/conftest.py
