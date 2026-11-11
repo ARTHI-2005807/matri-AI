@@ -31,8 +31,75 @@ from app.users import UserStore  # noqa: F401
 mcp = FastMCP("tasks", host="0.0.0.0", port=int(os.getenv("MCP_PORT", "9000")))
 store = TaskStore()
 
-# TODO(task 9): the eight tools (@mcp.tool())
-# TODO(task 9): current_user_id(ctx), used by every tool
+def current_user_id(ctx: Context) -> str:
+    header = ctx.request_context.request.headers.get("authorization", "")
+    if not header.lower().startswith("bearer ") or not (user := UserStore().user_for_token(header[7:].strip())):
+        raise ToolError("ERROR[UNAUTHENTICATED]: a valid bearer token is required. Next step: log in and retry.")
+    return user["user_id"]
+
+
+@mcp.tool()
+def add_note(title: str, body: str, ctx: Context) -> str:
+    try:
+        return json.dumps(store.add_note(current_user_id(ctx), title, body))
+    except TaskError as exc:
+        raise ToolError(str(exc)) from exc
+
+
+@mcp.tool()
+def list_notes(ctx: Context) -> str:
+    try:
+        return json.dumps(store.list_notes(current_user_id(ctx)))
+    except TaskError as exc:
+        raise ToolError(str(exc)) from exc
+
+
+@mcp.tool()
+def delete_note(note_id: int, ctx: Context) -> str:
+    try:
+        return json.dumps(store.delete_note(current_user_id(ctx), note_id))
+    except TaskError as exc:
+        raise ToolError(str(exc)) from exc
+
+
+@mcp.tool()
+def add_task(title: str, details: str = "", ctx: Context = None) -> str:
+    try:
+        return json.dumps(store.add_task(current_user_id(ctx), title, details))
+    except TaskError as exc:
+        raise ToolError(str(exc)) from exc
+
+
+@mcp.tool()
+def list_tasks(status: str = "", ctx: Context = None) -> str:
+    try:
+        return json.dumps(store.list_tasks(current_user_id(ctx), status))
+    except TaskError as exc:
+        raise ToolError(str(exc)) from exc
+
+
+@mcp.tool()
+def set_task_status(task_id: int, status: str, ctx: Context = None) -> str:
+    try:
+        return json.dumps(store.set_task_status(current_user_id(ctx), task_id, status))
+    except TaskError as exc:
+        raise ToolError(str(exc)) from exc
+
+
+@mcp.tool()
+def delete_task(task_id: int, ctx: Context = None) -> str:
+    try:
+        return json.dumps(store.delete_task(current_user_id(ctx), task_id))
+    except TaskError as exc:
+        raise ToolError(str(exc)) from exc
+
+
+@mcp.tool()
+def task_summary(ctx: Context) -> str:
+    try:
+        return json.dumps(store.summary(current_user_id(ctx)))
+    except TaskError as exc:
+        raise ToolError(str(exc)) from exc
 
 
 if __name__ == "__main__":

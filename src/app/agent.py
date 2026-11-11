@@ -6,7 +6,6 @@ from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware, ModelRequest, dynamic_prompt
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_mcp_adapters.client import MultiServerMCPClient
-from langgraph.checkpoint.memory import InMemorySaver
 
 from app.context import Ctx
 from app.custom_tools import build_custom_tools
@@ -71,7 +70,12 @@ async def mcp_tools():
     The token comes from Ctx (task 9: add `token` to Ctx, /agent fills it from the Authorization header). The model never sees it.
     """
     url = os.getenv("MCP_URL", "http://localhost:9000/mcp")
-    client = MultiServerMCPClient({"tasks": {"url": url, "transport": "streamable_http"}})  # TODO(task 9): tool_interceptors=[...]
+    async def interceptor(request, handler):
+        token = getattr(request.runtime.context, "token", "")
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        return await handler(request.override(headers=headers))
+    client = MultiServerMCPClient({"tasks": {"url": url, "transport": "streamable_http"}},
+                                  tool_interceptors=[interceptor])
     for attempt in range(15):
         try:
             return await client.get_tools()
@@ -99,8 +103,18 @@ async def build_agent(kb: KnowledgeBase, model=agent_llm, checkpointer=None):
       5. MEMORY: checkpointer=checkpointer (task 3), so each thread_id keeps its own conversation
       6. return `agent, tools`   (the TOOL OBJECTS; main.py builds /health and /debug/tools from them)
     """
-    tools = [*S1_TOOLS]  # TODO(task 1.1)
-    agent = create_agent(model=model, tools=tools, system_prompt=SYSTEM_PROMPT)  # TODO(task 1.2 - 1.5)
+    kb_tools = build_kb_tools(kb)
+    mcp = await mcp_tools()
+    custom = build_custom_tools(kb)
+
+    @dynamic_prompt
+    def prompt(request: ModelRequest) -> str:
+        ctx = request.runtime.context
+        return f"{SYSTEM_PROMPT}\n\n{kb.prompt_block(ctx.user_id)}"
+
+    tools = [*S1_TOOLS, *kb_tools, *mcp, *custom]
+    agent = create_agent(model=model, tools=tools, middleware=[prompt, ShrinkOldToolResults()],
+                         context_schema=Ctx, checkpointer=checkpointer)
     return agent, tools
 
 
