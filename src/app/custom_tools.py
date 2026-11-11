@@ -77,6 +77,9 @@ def build_custom_tools(kb: KnowledgeBase) -> list:
 
     @tool
     async def kb_stats(top_keywords: int = 5, runtime: ToolRuntime[Ctx] = None) -> str:
+        """Show statistics about the user's knowledge base: document count, section count, chunk count and top keywords.
+        Use this when the user asks what is in their knowledge base, how many documents they have, or what topics are covered.
+        top_keywords: how many top keywords to return (1-20, default 5)."""
         t0 = time.perf_counter()
         status = "ok"
         try:
@@ -95,6 +98,9 @@ def build_custom_tools(kb: KnowledgeBase) -> list:
 
     @tool
     async def document_outline(doc_name: str, runtime: ToolRuntime[Ctx]) -> str:
+        """Show the structure and outline of a specific document in the user's knowledge base.
+        Use this when the user asks what a document contains, how it is organised, or which section covers a topic.
+        doc_name: the exact file name of the document (from the knowledge base list)."""
         t0 = time.perf_counter()
         status, count = "ok", 0
         try:
@@ -125,12 +131,19 @@ def build_custom_tools(kb: KnowledgeBase) -> list:
 
     @tool
     async def delete_document(doc_name: str, runtime: ToolRuntime[Ctx]) -> str:
+        """Permanently delete a document from the user's knowledge base.
+        Use this when the user asks to remove or delete a specific document.
+        doc_name: the exact file name of the document to delete (from the knowledge base list)."""
         exact, doc = await find_or_error(runtime.context.user_id, doc_name)
         await asyncio.to_thread(kb.delete_document, runtime.context.user_id, doc["doc_id"])
         return f"Deleted '{exact}'. {len(kb.documents(runtime.context.user_id))} documents left."
 
     @tool
     async def update_document(doc_name: str, source: str, runtime: ToolRuntime[Ctx]) -> str:
+        """Replace an existing document in the knowledge base with a newly uploaded version.
+        Use this when the user uploads a new version of an existing document and wants to replace the old one.
+        doc_name: the exact file name of the document to replace (from the knowledge base list).
+        source: the file_id of the newly uploaded file."""
         exact, doc = await find_or_error(runtime.context.user_id, doc_name)
         try:
             path, _ = files.resolve(runtime.context.session_id, source.strip())

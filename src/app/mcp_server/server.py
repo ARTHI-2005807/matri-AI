@@ -40,6 +40,7 @@ def current_user_id(ctx: Context) -> str:
 
 @mcp.tool()
 def add_note(title: str, body: str, ctx: Context) -> str:
+    """Add a new note for the current user. Use when the user wants to save a note or reminder. title: short title; body: note content."""
     try:
         return json.dumps(store.add_note(current_user_id(ctx), title, body))
     except TaskError as exc:
@@ -48,6 +49,7 @@ def add_note(title: str, body: str, ctx: Context) -> str:
 
 @mcp.tool()
 def list_notes(ctx: Context) -> str:
+    """List all notes for the current user. Use when the user wants to see their saved notes."""
     try:
         return json.dumps(store.list_notes(current_user_id(ctx)))
     except TaskError as exc:
@@ -56,6 +58,7 @@ def list_notes(ctx: Context) -> str:
 
 @mcp.tool()
 def delete_note(note_id: int, ctx: Context) -> str:
+    """Delete a specific note by its ID. Use when the user wants to remove a note. note_id: the ID of the note to delete."""
     try:
         return json.dumps(store.delete_note(current_user_id(ctx), note_id))
     except TaskError as exc:
@@ -64,6 +67,7 @@ def delete_note(note_id: int, ctx: Context) -> str:
 
 @mcp.tool()
 def add_task(title: str, details: str = "", ctx: Context = None) -> str:
+    """Add a new task for the current user. Use when the user wants to create a to-do item. title: task title; details: optional extra details."""
     try:
         return json.dumps(store.add_task(current_user_id(ctx), title, details))
     except TaskError as exc:
@@ -72,6 +76,7 @@ def add_task(title: str, details: str = "", ctx: Context = None) -> str:
 
 @mcp.tool()
 def list_tasks(status: str = "", ctx: Context = None) -> str:
+    """List tasks for the current user. Use when the user wants to see their tasks. status: filter by 'todo', 'in_progress', or 'done'; leave empty for all tasks."""
     try:
         return json.dumps(store.list_tasks(current_user_id(ctx), status))
     except TaskError as exc:
@@ -80,6 +85,7 @@ def list_tasks(status: str = "", ctx: Context = None) -> str:
 
 @mcp.tool()
 def set_task_status(task_id: int, status: str, ctx: Context = None) -> str:
+    """Update the status of a task. Use when the user wants to mark a task as todo, in_progress, or done. task_id: the task ID; status: 'todo', 'in_progress', or 'done'."""
     try:
         return json.dumps(store.set_task_status(current_user_id(ctx), task_id, status))
     except TaskError as exc:
@@ -88,6 +94,7 @@ def set_task_status(task_id: int, status: str, ctx: Context = None) -> str:
 
 @mcp.tool()
 def delete_task(task_id: int, ctx: Context = None) -> str:
+    """Delete a specific task by its ID. Use when the user wants to remove a task. task_id: the ID of the task to delete."""
     try:
         return json.dumps(store.delete_task(current_user_id(ctx), task_id))
     except TaskError as exc:
@@ -96,6 +103,7 @@ def delete_task(task_id: int, ctx: Context = None) -> str:
 
 @mcp.tool()
 def task_summary(ctx: Context) -> str:
+    """Show a summary of all tasks grouped by status (todo, in_progress, done). Use when the user wants an overview of their tasks."""
     try:
         return json.dumps(store.summary(current_user_id(ctx)))
     except TaskError as exc:
