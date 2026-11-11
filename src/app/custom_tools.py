@@ -88,7 +88,7 @@ def build_custom_tools(kb: KnowledgeBase) -> list:
             result = await asyncio.to_thread(kb.stats, runtime.context.user_id)
             if not result["documents"]:
                 return "The knowledge base is empty."
-            return f"{result['documents']} documents, {result['sections']} sections, {result['chunks']} chunks. Top keywords: {', '.join(result['keywords'][:top_keywords])}"
+            return f"{result['documents']} documents, {result['sections']} sections, {result['chunks']} chunks. Top keywords: {', '.join(result['keywords'][:top_keywords])}."
         except Exception:
             status = "error"
             raise
